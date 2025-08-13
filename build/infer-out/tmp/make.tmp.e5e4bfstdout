@@ -1,0 +1,50 @@
+[  0%] Building C object CMakeFiles/asn1-objs.dir/bsl/asn1/src/bsl_asn1.c.o
+[  1%] Building C object CMakeFiles/asn1-objs.dir/bsl/asn1/src/bsl_asn1_print.c.o
+[  1%] Built target asn1-objs
+[  1%] Building C object CMakeFiles/base64-objs.dir/bsl/base64/src/bsl_base64.c.o
+[  1%] Built target base64-objs
+[  2%] Building C object CMakeFiles/buffer-objs.dir/bsl/buffer/src/bsl_buffer.c.o
+[  2%] Built target buffer-objs
+[  3%] Building C object CMakeFiles/err-objs.dir/bsl/err/src/avl.c.o
+[  3%] Building C object CMakeFiles/err-objs.dir/bsl/err/src/err.c.o
+[  3%] Built target err-objs
+[  3%] Building C object CMakeFiles/hash-objs.dir/bsl/hash/src/bsl_hash.c.o
+[  3%] Building C object CMakeFiles/hash-objs.dir/bsl/hash/src/bsl_hash_list.c.o
+[  4%] Building C object CMakeFiles/hash-objs.dir/bsl/hash/src/hash_local.c.o
+[  4%] Building C object CMakeFiles/hash-objs.dir/bsl/hash/src/list_base.c.o
+[  4%] Built target hash-objs
+[  4%] Building C object CMakeFiles/init-objs.dir/bsl/init/bsl_init.c.o
+[  4%] Built target init-objs
+[  4%] Building C object CMakeFiles/list-objs.dir/bsl/list/src/bsl_list.c.o
+[  4%] Building C object CMakeFiles/list-objs.dir/bsl/list/src/bsl_list_ex.c.o
+[  4%] Building C object CMakeFiles/list-objs.dir/bsl/list/src/bsl_list_internal.c.o
+[  4%] Built target list-objs
+[  5%] Building C object CMakeFiles/log-objs.dir/bsl/log/src/log.c.o
+[  5%] Built target log-objs
+[  5%] Building C object CMakeFiles/obj-objs.dir/bsl/obj/src/bsl_cid_op.c.o
+[  6%] Building C object CMakeFiles/obj-objs.dir/bsl/obj/src/bsl_obj.c.o
+[  6%] Built target obj-objs
+[  7%] Building C object CMakeFiles/params-objs.dir/bsl/params/src/bsl_params.c.o
+[  7%] Built target params-objs
+[  7%] Building C object CMakeFiles/pem-objs.dir/bsl/pem/src/bsl_pem.c.o
+[  7%] Built target pem-objs
+[  7%] Building C object CMakeFiles/sal-objs.dir/bsl/sal/src/linux/linux_sal_dl.c.o
+[  8%] Building C object CMakeFiles/sal-objs.dir/bsl/sal/src/linux/linux_sal_file.c.o
+[  8%] Building C object CMakeFiles/sal-objs.dir/bsl/sal/src/linux/linux_sal_lockimpl.c.o
+[  8%] Building C object CMakeFiles/sal-objs.dir/bsl/sal/src/linux/linux_sal_mem.c.o
+[  9%] Building C object CMakeFiles/sal-objs.dir/bsl/sal/src/linux/linux_sal_net.c.o
+[  9%] Building C object CMakeFiles/sal-objs.dir/bsl/sal/src/linux/linux_time_impl.c.o
+[  9%] Building C object CMakeFiles/sal-objs.dir/bsl/sal/src/sal_atomic.c.o
+[  9%] Building C object CMakeFiles/sal-objs.dir/bsl/sal/src/sal_ctrl.c.o
+[ 10%] Building C object CMakeFiles/sal-objs.dir/bsl/sal/src/sal_dl.c.o
+[ 10%] Building C object CMakeFiles/sal-objs.dir/bsl/sal/src/sal_file.c.o
+[ 10%] Building C object CMakeFiles/sal-objs.dir/bsl/sal/src/sal_mem.c.o
+[ 10%] Building C object CMakeFiles/sal-objs.dir/bsl/sal/src/sal_net.c.o
+[ 11%] Building C object CMakeFiles/sal-objs.dir/bsl/sal/src/sal_string.c.o
+[ 11%] Building C object CMakeFiles/sal-objs.dir/bsl/sal/src/sal_threadlock.c.o
+[ 11%] Building C object CMakeFiles/sal-objs.dir/bsl/sal/src/sal_time.c.o
+[ 11%] Built target sal-objs
+[ 12%] Building C object CMakeFiles/tlv-objs.dir/bsl/tlv/src/tlv.c.o
+[ 12%] Built target tlv-objs
+[ 12%] Building C object CMakeFiles/uio-objs.dir/bsl/uio/src/uio_abstraction.c.o
+[ 12%] Building C object CMakeFiles/uio-objs.dir/bsl/uio/src/uio_addr.c.o

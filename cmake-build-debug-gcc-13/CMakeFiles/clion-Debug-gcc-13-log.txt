@@ -1,0 +1,28 @@
+/Users/westtide/Applications/CLion.app/Contents/bin/cmake/mac/aarch64/bin/cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_MAKE_PROGRAM=/Users/westtide/Applications/CLion.app/Contents/bin/ninja/mac/aarch64/ninja -DCMAKE_C_COMPILER=/opt/homebrew/bin/gcc-13 -DCMAKE_CXX_COMPILER=/opt/homebrew/bin/g++-13 -G Ninja -S /Users/westtide/Developer/openhitls -B /Users/westtide/Developer/openhitls/cmake-build-debug-gcc-13
+CMake Warning at /Users/westtide/Applications/CLion.app/Contents/bin/cmake/mac/aarch64/share/cmake-3.31/Modules/Platform/Darwin-Initialize.cmake:311 (message):
+  Ignoring CMAKE_OSX_SYSROOT value:
+
+   /Applications/Xcode-beta.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.0.sdk
+
+  because the directory does not exist.
+Call Stack (most recent call first):
+  /Users/westtide/Applications/CLion.app/Contents/bin/cmake/mac/aarch64/share/cmake-3.31/Modules/CMakeSystemSpecificInitialize.cmake:34 (include)
+  CMakeLists.txt:16 (project)
+
+
+-- Configuring done (0.5s)
+CMake Error:
+  Running
+
+   '/Users/westtide/Applications/CLion.app/Contents/bin/ninja/mac/aarch64/ninja' '-C' '/Users/westtide/Developer/openhitls/cmake-build-debug-gcc-13' '-t' 'recompact'
+
+  failed with:
+
+   ninja: error: build.ninja:54: bad $-escape (literal $ must be written as $$)
+
+  
+
+
+
+-- Generating done (0.1s)
+CMake Generate step failed.  Build files cannot be regenerated correctly.

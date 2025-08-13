@@ -1,0 +1,89 @@
+{
+    "endian": "little",
+    "libType": [
+        "static"
+    ],
+    "asmType": "no_asm",
+    "libs": {
+        "hitls_bsl": {
+            "c": [
+                "asn1",
+                "base64",
+                "buffer",
+                "err",
+                "hash",
+                "init",
+                "list",
+                "log",
+                "obj",
+                "params",
+                "pem",
+                "sal",
+                "sal_dl",
+                "sal_file",
+                "sal_lock",
+                "sal_mem",
+                "sal_net",
+                "sal_str",
+                "sal_thread",
+                "sal_time",
+                "tlv",
+                "uio_addr",
+                "uio_buffer",
+                "uio_mem",
+                "uio_plt",
+                "uio_tcp",
+                "uio_udp",
+                "usrdata"
+            ]
+        },
+        "hitls_crypto": {
+            "c": [
+                "bn",
+                "cipher",
+                "drbg",
+                "eal",
+                "ealinit",
+                "encode_decode",
+                "entropy",
+                "hpke",
+                "kdf",
+                "mac",
+                "md",
+                "modes",
+                "pkey",
+                "provider"
+            ]
+        },
+        "hitls_tls": {
+            "c": [
+                "callback",
+                "config",
+                "connection",
+                "feature",
+                "host",
+                "maintain",
+                "proto",
+                "proto_version",
+                "suite",
+                "suite_auth",
+                "suite_cipher",
+                "suite_kx"
+            ]
+        },
+        "hitls_pki": {
+            "c": [
+                "info",
+                "pkcs12",
+                "x509"
+            ]
+        },
+        "hitls_auth": {
+            "c": [
+                "privpass_token"
+            ]
+        }
+    },
+    "system": "linux",
+    "bits": 64
+}

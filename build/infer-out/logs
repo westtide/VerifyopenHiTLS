@@ -1,0 +1,80 @@
+[3952][environment] CWD = /Users/westtide/Developer/openhitls/build
+[3952][environment] No .inferconfig file found
+[3952][environment] Project root = /Users/westtide/Developer/openhitls/build
+[3952][environment] INFER_ARGS =   @/var/folders/1h/zn123vdj1410n5k0mcd5_d280000gn/T/args.tmp.7acf91
+[3952][environment]                --progress-bar-style multiline
+[3952][environment] command line arguments:   infer run -- make
+[3952][environment] Could not retrieve available memory (possibly not on Linux)
+[3952][environment] Active checkers: self-in-block (C/C++/ObjC), parameter-not-null-checked (C/C++/ObjC), static-constructor-stall-checker (C/C++/ObjC), starvation (C/C++/ObjC, Java), siof (C/C++/ObjC), racerd (C/C++/ObjC, C#/.Net, Java), pulse (C/C++/ObjC, C#/.Net, Erlang, Hack, Java, Python, Rust, Swift), liveness (C/C++/ObjC), inefficient-keyset-iterator (Java), fragment-retains-view (Java)
+[3952][environment] Scheduler: restart
+[3952][environment] Cores used: 8
+[3952][environment] Infer version v1.2.0-44760f772d
+[3952][environment] Copyright 2009 - present Facebook. All Rights Reserved.
+[3952][environment] 
+[3952][   progress] Capturing in make/cc mode...
+[3952][environment] Running command make with env:
+[3952][environment] (Extend((PATH"/usr/local/lib/infer/infer/bin/../lib/wrappers:/Users/westtide/.opam/5.2.1+flambda/bin:/Users/westtide/.nvm/versions/node/v20.19.1/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/opt/homebrew/opt/llvm/bin:/opt/homebrew/Cellar/llvm/17.0.6/bin/:/opt/homebrew/opt/sqlite/bin:/opt/homebrew/opt/ruby/bin:/usr/local/opt/curl/bin:/Applications/copt60/bin:/usr/local/opt/ruby/bin:/Users/westtide/opt/anaconda3/bin:/Users/westtide/opt/anaconda3/condabin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/Library/Apple/usr/bin:/Library/TeX/texbin:/Applications/VMware Fusion.app/Contents/Public:/usr/local/go/bin:/Users/westtide/.cargo/bin:/Users/westtide/Library/Application Support/JetBrains/Toolbox/scripts:/Users/westtide/Library/Application Support/Coursier/bin")(INFER_OLD_PATH"/Users/westtide/.opam/5.2.1+flambda/bin:/Users/westtide/.nvm/versions/node/v20.19.1/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/opt/homebrew/opt/llvm/bin:/opt/homebrew/Cellar/llvm/17.0.6/bin/:/opt/homebrew/opt/sqlite/bin:/opt/homebrew/opt/ruby/bin:/usr/local/opt/curl/bin:/Applications/copt60/bin:/usr/local/opt/ruby/bin:/Users/westtide/opt/anaconda3/bin:/Users/westtide/opt/anaconda3/condabin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/Library/Apple/usr/bin:/Library/TeX/texbin:/Applications/VMware Fusion.app/Contents/Public:/usr/local/go/bin:/Users/westtide/.cargo/bin:/Users/westtide/Library/Application Support/JetBrains/Toolbox/scripts:/Users/westtide/Library/Application Support/Coursier/bin")))
+[3952][environment] 
+[3952][   progress] make-stdout: In file included from /Users/westtide/Developer/openhitls/bsl/uio/src/uio_addr.c:22:
+[3952][   progress] make-stdout: /Users/westtide/Developer/openhitls/bsl/uio/include/uio_local.h:24:2: error: #error "only support linux"
+[3952][   progress] make-stdout:    24 | #error "only support linux"
+[3952][   progress] make-stdout:       |  ^~~~~
+[3952][   progress] make-stdout: /Users/westtide/Developer/openhitls/bsl/uio/include/uio_local.h:57:21: error: field 'addr' has incomplete type
+[3952][   progress] make-stdout:    57 |     struct sockaddr addr;
+[3952][   progress] make-stdout:       |                     ^~~~
+[3952][   progress] make-stdout: /Users/westtide/Developer/openhitls/bsl/uio/include/uio_local.h:58:25: error: field 'addrIn6' has incomplete type
+[3952][   progress] make-stdout:    58 |     struct sockaddr_in6 addrIn6;
+[3952][   progress] make-stdout:       |                         ^~~~~~~
+[3952][   progress] make-stdout: /Users/westtide/Developer/openhitls/bsl/uio/include/uio_local.h:59:24: error: field 'addrIn' has incomplete type
+[3952][   progress] make-stdout:    59 |     struct sockaddr_in addrIn;
+[3952][   progress] make-stdout:       |                        ^~~~~~
+[3952][   progress] make-stdout: /Users/westtide/Developer/openhitls/bsl/uio/include/uio_local.h:60:24: error: field 'addrUn' has incomplete type
+[3952][   progress] make-stdout:    60 |     struct sockaddr_un addrUn;
+[3952][   progress] make-stdout:       |                        ^~~~~~
+[3952][   progress] make-stdout: /Users/westtide/Developer/openhitls/bsl/uio/src/uio_addr.c: In function 'BSL_UIO_AddrNew':
+[3952][   progress] make-stdout: /Users/westtide/Developer/openhitls/bsl/uio/src/uio_addr.c:43:28: error: 'AF_UNSPEC' undeclared (first use in this function)
+[3952][   progress] make-stdout:    43 |     addr->addr.sa_family = AF_UNSPEC;
+[3952][   progress] make-stdout:       |                            ^~~~~~~~~
+[3952][   progress] make-stdout: /Users/westtide/Developer/openhitls/bsl/uio/src/uio_addr.c:43:28: note: each undeclared identifier is reported only once for each function it appears in
+[3952][   progress] make-stdout: /Users/westtide/Developer/openhitls/bsl/uio/src/uio_addr.c: In function 'BSL_UIO_AddrMake':
+[3952][   progress] make-stdout: /Users/westtide/Developer/openhitls/bsl/uio/src/uio_addr.c:49:21: error: invalid use of undefined type 'const struct sockaddr'
+[3952][   progress] make-stdout:    49 |     switch (sockAddr->sa_family) {
+[3952][   progress] make-stdout:       |                     ^~
+[3952][   progress] make-stdout: /Users/westtide/Developer/openhitls/bsl/uio/src/uio_addr.c:50:14: error: 'AF_INET' undeclared (first use in this function)
+[3952][   progress] make-stdout:    50 |         case AF_INET:
+[3952][   progress] make-stdout:       |              ^~~~~~~
+[3952][   progress] make-stdout: /Users/westtide/Developer/openhitls/bsl/uio/src/uio_addr.c:51:87: error: invalid application of 'sizeof' to incomplete type 'struct sockaddr_in'
+[3952][   progress] make-stdout:    51 |             (void)memcpy_s(&(uioAddr->addrIn), sizeof(BSL_UIO_Addr), sockAddr, sizeof(struct sockaddr_in));
+[3952][   progress] make-stdout:       |                                                                                       ^~~~~~
+[3952][   progress] make-stdout: /Users/westtide/Developer/openhitls/bsl/uio/src/uio_addr.c:53:14: error: 'AF_INET6' undeclared (first use in this function)
+[3952][   progress] make-stdout:    53 |         case AF_INET6:
+[3952][   progress] make-stdout:       |              ^~~~~~~~
+[3952][   progress] make-stdout: /Users/westtide/Developer/openhitls/bsl/uio/src/uio_addr.c:54:88: error: invalid application of 'sizeof' to incomplete type 'struct sockaddr_in6'
+[3952][   progress] make-stdout:    54 |             (void)memcpy_s(&(uioAddr->addrIn6), sizeof(BSL_UIO_Addr), sockAddr, sizeof(struct sockaddr_in6));
+[3952][   progress] make-stdout:       |                                                                                        ^~~~~~
+[3952][   progress] make-stdout: /Users/westtide/Developer/openhitls/bsl/uio/src/uio_addr.c:56:14: error: 'AF_UNIX' undeclared (first use in this function)
+[3952][   progress] make-stdout:    56 |         case AF_UNIX:
+[3952][   progress] make-stdout:       |              ^~~~~~~
+[3952][   progress] make-stdout: /Users/westtide/Developer/openhitls/bsl/uio/src/uio_addr.c:57:87: error: invalid application of 'sizeof' to incomplete type 'struct sockaddr_un'
+[3952][   progress] make-stdout:    57 |             (void)memcpy_s(&(uioAddr->addrUn), sizeof(BSL_UIO_Addr), sockAddr, sizeof(struct sockaddr_un));
+[3952][   progress] make-stdout:       |                                                                                       ^~~~~~
+[3952][   progress] make-stdout: /Users/westtide/Developer/openhitls/bsl/uio/src/uio_addr.c: In function 'BSL_UIO_SockAddrSize':
+[3952][   progress] make-stdout: /Users/westtide/Developer/openhitls/bsl/uio/src/uio_addr.c:69:14: error: 'AF_INET' undeclared (first use in this function)
+[3952][   progress] make-stdout:    69 |         case AF_INET:
+[3952][   progress] make-stdout:       |              ^~~~~~~
+[3952][   progress] make-stdout: /Users/westtide/Developer/openhitls/bsl/uio/src/uio_addr.c:71:14: error: 'AF_INET6' undeclared (first use in this function)
+[3952][   progress] make-stdout:    71 |         case AF_INET6:
+[3952][   progress] make-stdout:       |              ^~~~~~~~
+[3952][   progress] make-stdout: /Users/westtide/Developer/openhitls/bsl/uio/src/uio_addr.c:73:14: error: 'AF_UNIX' undeclared (first use in this function)
+[3952][   progress] make-stdout:    73 |         case AF_UNIX:
+[3952][   progress] make-stdout:       |              ^~~~~~~
+[3952][   progress] make-stdout: make[2]: *** [CMakeFiles/uio-objs.dir/bsl/uio/src/uio_addr.c.o] Error 1
+[3952][   progress] make-stdout: make[1]: *** [CMakeFiles/uio-objs.dir/all] Error 2
+[3952][   progress] make-stdout: make: *** [all] Error 2
+[3952][ extern err] Error executing:   make
+exited with code 2
+
+[3952][ extern err] Raised at Stdlib.input_line.scan in file "stdlib.ml", line 456, characters 14-31
+Called from Stdio__In_channel.input_line_exn in file "src/in_channel.ml" (inlined), line 64, characters 13-32
+Called from IBase__Utils.with_channel_in in file "src/base/Utils.ml", line 257, characters 11-44
+

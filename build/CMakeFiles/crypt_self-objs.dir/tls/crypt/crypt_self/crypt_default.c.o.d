@@ -1,0 +1,8 @@
+CMakeFiles/crypt_self-objs.dir/tls/crypt/crypt_self/crypt_default.c.o: \
+ /Users/westtide/Developer/openhitls/tls/crypt/crypt_self/crypt_default.c \
+ /Users/westtide/Developer/openhitls/config/macro_config/hitls_build.h \
+ /Users/westtide/Developer/openhitls/config/macro_config/hitls_config_layer_tls.h \
+ /Users/westtide/Developer/openhitls/config/macro_config/hitls_config_layer_pki.h \
+ /Users/westtide/Developer/openhitls/config/macro_config/hitls_config_layer_crypto.h \
+ /Users/westtide/Developer/openhitls/config/macro_config/hitls_config_layer_bsl.h \
+ /Users/westtide/Developer/openhitls/config/macro_config/hitls_config_check.h

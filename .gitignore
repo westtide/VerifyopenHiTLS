@@ -1,0 +1,31 @@
+# Frama-C 生成的文件
+*.i
+*.jessie
+*.why*
+.frama-c/
+
+# 编译生成的文件
+*.o
+*.a
+*.so
+*.dylib
+test_sm3
+test_*
+
+# IDE 和编辑器文件
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 临时文件
+*.tmp
+*.bak
+
+# 日志文件
+*.log

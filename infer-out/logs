@@ -1,0 +1,156 @@
+[8845][environment] CWD = /Users/westtide/Developer/openhitls
+[8845][environment] No .inferconfig file found
+[8845][environment] Project root = /Users/westtide/Developer/openhitls
+[8845][environment] INFER_ARGS =   @/var/folders/1h/zn123vdj1410n5k0mcd5_d280000gn/T/args.tmp.f95d8e
+[8845][environment]                --progress-bar-style multiline
+[8845][environment] command line arguments:   infer run --keep-going -- gcc -I
+[8845][environment]                           /Users/westtide/Developer/openhitls/config/macro_config
+[8845][environment]                           -c
+[8845][environment]                           /Users/westtide/Developer/openhitls/crypto/sm4/src/crypt_sm4_armv8.h
+[8845][environment] Could not retrieve available memory (possibly not on Linux)
+[8845][environment] Active checkers: self-in-block (C/C++/ObjC), parameter-not-null-checked (C/C++/ObjC), static-constructor-stall-checker (C/C++/ObjC), starvation (C/C++/ObjC, Java), siof (C/C++/ObjC), racerd (C/C++/ObjC, C#/.Net, Java), pulse (C/C++/ObjC, C#/.Net, Erlang, Hack, Java, Python, Rust, Swift), liveness (C/C++/ObjC), inefficient-keyset-iterator (Java), fragment-retains-view (Java)
+[8845][environment] Scheduler: restart
+[8845][environment] Cores used: 8
+[8845][environment] Infer version v1.2.0-44760f772d
+[8845][environment] Copyright 2009 - present Facebook. All Rights Reserved.
+[8845][environment] 
+[8845][   progress] Capturing in make/cc mode...
+[8845][      debug] 
+[8845][      debug] *** Beginning capture of file /Users/westtide/Developer/openhitls/crypto/sm4/src/crypt_sm4_armv8.h ***
+[8845][      debug] Elapsed: 20.3ms.
+[8845][      debug] GC stats for capture:
+[8845][      debug]   minor_words: 0
+[8845][      debug]   promoted_words: 0
+[8845][      debug]   major_words: 0
+[8845][      debug]   minor_collections: 0
+[8845][      debug]   major_collections: 0
+[8845][      debug]   compactions: 0
+[8845][      debug]   top_heap_words: 629466
+[8845][      debug]   
+[8845][environment] Parallel jobs: 8
+[8845][   progress] Found 1 source file to analyze in /Users/westtide/Developer/openhitls/infer-out
+[8851][   progress] crypto/sm4/src/crypt_sm4_armv8.h starting
+[8851][   progress] crypto/sm4/src/crypt_sm4_armv8.h DONE
+[8845][      debug] restart count: 0
+[8845][      debug] Backend stats:
+[8845][      debug]   summary_file_try_load= 0
+[8845][      debug]   summary_read_from_disk= 0
+[8845][      debug]   summary_specializations= 0
+[8845][      debug]   ondemand_procs_analyzed= 0
+[8845][      debug]   ondemand_double_analysis_prevented= 0
+[8845][      debug]   ondemand_recursion_cycle_restart_limit_hit= 0
+[8845][      debug]   ondemand_callchain_limit_hit= 0
+[8845][      debug]   proc_locker_lock_time_user= 0.00000000
+[8845][      debug]   proc_locker_lock_time_sys= 0.00000000
+[8845][      debug]   proc_locker_lock_time_wall= 0.00000000
+[8845][      debug]   proc_locker_lock_time_oncpu_pct= 0%
+[8845][      debug]   proc_locker_unlock_time_user= 0.00000000
+[8845][      debug]   proc_locker_unlock_time_sys= 0.00000000
+[8845][      debug]   proc_locker_unlock_time_wall= 0.00000000
+[8845][      debug]   proc_locker_unlock_time_oncpu_pct= 0%
+[8845][      debug]   restart_scheduler_useful_time_user= 0.00000000
+[8845][      debug]   restart_scheduler_useful_time_sys= 0.00000000
+[8845][      debug]   restart_scheduler_useful_time_wall= 0.00000000
+[8845][      debug]   restart_scheduler_useful_time_oncpu_pct= 0%
+[8845][      debug]   restart_scheduler_total_time_user= 0.00000000
+[8845][      debug]   restart_scheduler_total_time_sys= 0.00000000
+[8845][      debug]   restart_scheduler_total_time_wall= 0.00000000
+[8845][      debug]   restart_scheduler_total_time_oncpu_pct= 0%
+[8845][      debug]   pulse_aliasing_contradictions= 0
+[8845][      debug]   pulse_args_length_contradictions= 0
+[8845][      debug]   pulse_captured_vars_length_contradictions= 0
+[8845][      debug]   pulse_disjuncts_dropped= 0
+[8845][      debug]   pulse_interrupted_loops= 0
+[8845][      debug]   pulse_unknown_calls= 0
+[8845][      debug]   pulse_unknown_calls_on_hack_resource= 0
+[8845][      debug]   pulse_summaries_contradictions= 0
+[8845][      debug]   pulse_summaries_unsat_for_caller= 0
+[8845][      debug]   pulse_summaries_unsat_for_caller_percent= 0
+[8845][      debug]   pulse_summaries_with_some_unreachable_nodes= 0
+[8845][      debug]   pulse_summaries_with_some_unreachable_nodes_percent= 0
+[8845][      debug]   pulse_summaries_with_some_unreachable_returns= 0
+[8845][      debug]   pulse_summaries_with_some_unreachable_returns_percent= 0.0%
+[8845][      debug]   pulse_summaries_count= []
+[8845][      debug]   pulse_summaries_total_disjuncts= 0
+[8845][      debug]   pulse_summaries_count_0_continue_program= 0
+[8845][      debug]   pulse_summaries_count_0_percent= 0
+[8845][      debug]   timeouts= 0
+[8845][      debug]   timings= 
+[8845][      debug]   longest_proc_duration_heap= [
+[8845][      debug]   
+[8845][      debug]   ]
+[8845][      debug]   process_times_user= 0.00019600
+[8845][      debug]   process_times_sys= 0.00064600
+[8845][      debug]   process_times_wall= 0.10270204
+[8845][      debug]   process_times_oncpu_pct= 1%
+[8845][      debug]   useful_times_user= 0.00008000
+[8845][      debug]   useful_times_sys= 0.00019900
+[8845][      debug]   useful_times_wall= 0.00027950
+[8845][      debug]   useful_times_oncpu_pct= 100%
+[8845][      debug]   spec_store_times_user= 0.00000000
+[8845][      debug]   spec_store_times_sys= 0.00000000
+[8845][      debug]   spec_store_times_wall= 0.00000000
+[8845][      debug]   spec_store_times_oncpu_pct= 0%
+[8845][      debug]   
+[8845][      debug] GC stats for backend_stats.gc_stats_add.:
+[8845][      debug]   minor_words: 0
+[8845][      debug]   promoted_words: 0
+[8845][      debug]   major_words: 0
+[8845][      debug]   minor_collections: 0
+[8845][      debug]   major_collections: 0
+[8845][      debug]   compactions: 0
+[8845][      debug]   top_heap_words: 5035728
+[8845][      debug]   
+[8845][      debug] GC stats for backend_stats.gc_stats_max.:
+[8845][      debug]   minor_words: 0
+[8845][      debug]   promoted_words: 0
+[8845][      debug]   major_words: 0
+[8845][      debug]   minor_collections: 0
+[8845][      debug]   major_collections: 0
+[8845][      debug]   compactions: 0
+[8845][      debug]   top_heap_words: 629466
+[8845][      debug]   
+[8845][      debug] Average over 8 processes
+[8845][      debug] GC stats for backend_stats.gc_stats_average.:
+[8845][      debug]   minor_words: 0
+[8845][      debug]   promoted_words: 0
+[8845][      debug]   major_words: 0
+[8845][      debug]   minor_collections: 0
+[8845][      debug]   major_collections: 0
+[8845][      debug]   compactions: 0
+[8845][      debug]   top_heap_words: 629466
+[8845][      debug]   
+[8845][      debug] Analysis phase finished in 22.9ms
+[8845][      debug] backend_stats.scheduler_process_analysis_time_user= 0.01068100
+[8845][      debug] backend_stats.scheduler_process_analysis_time_sys= 0.00990200
+[8845][      debug] backend_stats.scheduler_process_analysis_time_wall= 0.02283942
+[8845][      debug] backend_stats.scheduler_process_analysis_time_oncpu_pct= 90%
+[8845][      debug] GC stats for analysis_scheduler:
+[8845][      debug]   minor_words: 626089
+[8845][      debug]   promoted_words: 226544
+[8845][      debug]   major_words: 454072
+[8845][      debug]   minor_collections: 6
+[8845][      debug]   major_collections: 3
+[8845][      debug]   compactions: 1
+[8845][      debug]   top_heap_words: 861574
+[8845][      debug]   
+[8845][      debug] GC stats for report:
+[8845][      debug]   minor_words: 0
+[8845][      debug]   promoted_words: 0
+[8845][      debug]   major_words: 0
+[8845][      debug]   minor_collections: 0
+[8845][      debug]   major_collections: 0
+[8845][      debug]   compactions: 0
+[8845][      debug]   top_heap_words: 861574
+[8845][      debug]   
+[8845][      debug] GC stats for main_process_full:
+[8845][      debug]   minor_words: 3.72188e+06
+[8845][      debug]   promoted_words: 769400
+[8845][      debug]   major_words: 1.02158e+06
+[8845][      debug]   minor_collections: 16
+[8845][      debug]   major_collections: 8
+[8845][      debug]   compactions: 1
+[8845][      debug]   top_heap_words: 861574
+[8845][      debug]   
+[8845][     result] 
+  No issues found  
