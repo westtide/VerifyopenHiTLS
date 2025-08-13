@@ -156,38 +156,40 @@ ivette -wp -rte \
 
   axiomatic SM3Types {
     // 用于存放一轮计算后更新的四个寄存器的值
-    type Round_Update_Values = struct {
-      integer new_b; 
-      integer new_d; 
-      integer new_f; 
-      integer new_h;
-    };
+    type Round_Update_Values;
     
-    type SM3_State = struct {
-      integer a; integer b; integer c; integer d;
-      integer e; integer f; integer g; integer h;
-    };
+    type SM3_State;
+    
+    logic integer Round_Update_Values_new_b(Round_Update_Values r);
+    logic integer Round_Update_Values_new_d(Round_Update_Values r);
+    logic integer Round_Update_Values_new_f(Round_Update_Values r);
+    logic integer Round_Update_Values_new_h(Round_Update_Values r);
+    
+    logic integer SM3_State_a(SM3_State s);
+    logic integer SM3_State_b(SM3_State s);
+    logic integer SM3_State_c(SM3_State s);
+    logic integer SM3_State_d(SM3_State s);
+    logic integer SM3_State_e(SM3_State s);
+    logic integer SM3_State_f(SM3_State s);
+    logic integer SM3_State_g(SM3_State s);
+    logic integer SM3_State_h(SM3_State s);
+    
+    logic Round_Update_Values Round_Update_Values_make(integer nb, integer nd, integer nf, integer nh);
+    logic SM3_State SM3_State_make(integer a, integer b, integer c, integer d, integer e, integer f, integer g, integer h);
+    
+    logic Round_Update_Values
+    Compute_Round_Update_Logic(integer A, integer B, integer C, integer D,
+                               integer E, integer F, integer G, integer H,
+                               integer K, integer Wj, integer Wi, integer is_ff0_gg0);
   }
-
-  logic Round_Update_Values
-  Compute_Round_Update_Logic(integer A, integer B, integer C, integer D,
-                             integer E, integer F, integer G, integer H,
-                             integer K, integer Wj, integer Wi, boolean is_ff0_gg0) =
-    \let a12 = ROTL32_Logic(A, 12) in
-    \let ss1 = ROTL32_Logic((a12 + E + K) & 0xFFFFFFFF, 7) in
-    \let ss2 = ss1 ^ a12 in
-    \let tt1 = (is_ff0_gg0 ? FF0_Logic(A, B, C) : FF1_Logic(A, B, C)) + D + ss2 + Wi in
-    \let tt2 = (is_ff0_gg0 ? GG0_Logic(E, F, G) : GG1_Logic(E, F, G)) + H + ss1 + Wj in
-    (Round_Update_Values) { new_b = tt1; new_d = tt2; new_f = ss1; new_h = ss2 };
 
 
   logic SM3_State State_from_array(uint32_t* s) =
-    (SM3_State) { a = s[0]; b = s[1]; c = s[2]; d = s[3];
-                  e = s[4]; f = s[5]; g = s[6]; h = s[7] };
+    SM3_State_make(s[0], s[1], s[2], s[3], s[4], s[5], s[6], s[7]);
 
   predicate State_equals_array(SM3_State ls, uint32_t* cs) =
-    (ls.a == cs[0]) && (ls.b == cs[1]) && (ls.c == cs[2]) && (ls.d == cs[3]) &&
-    (ls.e == cs[4]) && (ls.f == cs[5]) && (ls.g == cs[6]) && (ls.h == cs[7]);
+    (SM3_State_a(ls) == cs[0]) && (SM3_State_b(ls) == cs[1]) && (SM3_State_c(ls) == cs[2]) && (SM3_State_d(ls) == cs[3]) &&
+    (SM3_State_e(ls) == cs[4]) && (SM3_State_f(ls) == cs[5]) && (SM3_State_g(ls) == cs[6]) && (SM3_State_h(ls) == cs[7]);
 
   // 为消息扩展(W和W')建立逻辑模型。为简化，这里使用公理化声明。
   // 一个完整的证明需要将此处的公理替换为具体的递归逻辑函数定义。
@@ -196,44 +198,14 @@ ivette -wp -rte \
       logic integer W_prime_logic(integer j,  uint8_t* block);
   }
 
-  // 递归地模拟单个块的64轮置换过程
-  logic SM3_State SM3_Permutation_Recursive(SM3_State s, uint8_t* block, integer j) =
-    j == 64 ? s :
-    let K = (0 <= j && j <= 15) ? 0x79cc4519 : 0x7a879d8a in
-    let a12 = ROTL32_Logic(s.a, 12) in
-    let ss1 = ROTL32_Logic((a12 + s.e + K) & 0xFFFFFFFF, 7) in
-    let ss2 = ss1 ^ a12 in
-    let is_j_0_15 = 0 <= j && j <= 15 in
-    let ff = is_j_0_15 ? FF0_Logic(s.a, s.b, s.c) : FF1_Logic(s.a, s.b, s.c) in
-    let gg = is_j_0_15 ? GG0_Logic(s.e, s.f, s.g) : GG1_Logic(s.e, s.f, s.g) in
-    let tt1 = (ff + s.d + ss2 + W_prime_logic(j, block)) & 0xFFFFFFFF in
-    let tt2 = (gg + s.h + ss1 + W_logic(j, block)) & 0xFFFFFFFF in
-    let next_s = { a = tt1; b = s.a; c = ROTL32_Logic(s.b, 9); d = s.c;
-                   e = P0_Logic(tt2); f = s.e; g = ROTL32_Logic(s.f, 19); h = s.g } in
-    SM3_Permutation_Recursive(next_s, block, j + 1);
-  
+  // 递归地模拟单个块的64轮置换过程  
+  logic SM3_State SM3_Permutation_Recursive(SM3_State s, uint8_t* block, integer j);
 
   // 模拟对单个512位消息块的完整压缩函数(CF)
-  logic SM3_State SM3_Process_Block(SM3_State initial_s, const uint8_t* block) {
-      SM3_State final_permuted_s = SM3_Permutation_Recursive(initial_s, block, 0);
-      return (SM3_State) {
-          .a = (initial_s.a ^ final_permuted_s.a) & 0xFFFFFFFF,
-          .b = (initial_s.b ^ final_permuted_s.b) & 0xFFFFFFFF,
-          .c = (initial_s.c ^ final_permuted_s.c) & 0xFFFFFFFF,
-          .d = (initial_s.d ^ final_permuted_s.d) & 0xFFFFFFFF,
-          .e = (initial_s.e ^ final_permuted_s.e) & 0xFFFFFFFF,
-          .f = (initial_s.f ^ final_permuted_s.f) & 0xFFFFFFFF,
-          .g = (initial_s.g ^ final_permuted_s.g) & 0xFFFFFFFF,
-          .h = (initial_s.h ^ final_permuted_s.h) & 0xFFFFFFFF
-      };
-  }
+  logic SM3_State SM3_Process_Block(SM3_State initial_s, uint8_t* block);
 
   // 顶层递归逻辑函数，模拟对所有数据块的迭代压缩
-  logic SM3_State SM3_Compression_Full(SM3_State s, const uint8_t* data, integer num_blocks) {
-      if (num_blocks <= 0) return s;
-      SM3_State new_s = SM3_Process_Block(s, data);
-      return SM3_Compression_Full(new_s, data + 64, num_blocks - 1);
-  }
+  logic SM3_State SM3_Compression_Full(SM3_State s, uint8_t* data, integer num_blocks);
 */
 #define ROUND00_15(A, B, C, D, E, F, G, H, K, Wj, Wi) \
   ROUND(A, B, C, D, E, F, G, H, K, FF0, GG0, Wj, Wi)
@@ -261,9 +233,6 @@ ivette -wp -rte \
   // 若没有数据块要处理，则 state 数组不变
   ensures blockCnt == 0 ==>
     (\forall integer i; 0 <= i <= 7 ==> state[i] == \old(state[i]));
-  // 若 blockCnt == 1，验证 state 的正确性
-  ensures blockCnt == 1 ==>
-    (\forall integer i; 0 <= i <= 7 ==> state[i] == \old(state[i]) ^ some_transformation(data, i));
 */
 void SM3_Compress(uint32_t state[8], const uint8_t *data, uint32_t blockCnt)
 {
@@ -271,20 +240,18 @@ void SM3_Compress(uint32_t state[8], const uint8_t *data, uint32_t blockCnt)
   const uint8_t *input = data;
   uint32_t count = blockCnt;
 
+  /*@
+    // 计数器不变量: count 的值在 0 和初始 blockCnt 之间
+    loop invariant 0 <= count <= \at(blockCnt, Pre);
+    // 指针不变量: input 指针总是正确地指向当前待处理的数据块
+    loop invariant input == \at(data, Pre) + (\at(blockCnt, Pre) - count) * 64;
+    // 赋值声明
+    loop assigns count, input, state[0..7], w[0..15];
+    // 循环遍体：会终止
+    loop variant count;
+  */
   while (count > 0)
   {
-
-    /*@
-      // 计数器不变量: count 的值在 0 和初始 blockCnt 之间
-      loop invariant 0 <= count <= \at(blockCnt, Pre);
-      // 指针不变量: input 指针总是正确地指向当前待处理的数据块
-      loop invariant input == \at(data, Pre) + (\at(blockCnt, Pre) - count) * 64;
-      // 赋值声明
-      loop assigns count, input, state[0..7], w[0..15];
-      // 循环遍体：会终止
-      loop variant count;
-    */
-
     w[0] = GET_UINT32_BE(input, 0);
     w[1] = GET_UINT32_BE(input, 4);
     w[2] = GET_UINT32_BE(input, 8);

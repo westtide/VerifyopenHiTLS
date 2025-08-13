@@ -20,10 +20,49 @@
 #include <stdbool.h>
 #include "securec.h"
 #include "bsl_sal.h"
+#include "bsl_init.h" // 添加此行以解析XBOX宏
 #include "bsl_err_internal.h"
 #include "crypt_errno.h"
 #include "crypt_utils.h"
 #include "crypt_sm4.h"
+
+/*@
+  assigns ((char*)dest)[0..count-1];
+  ensures \result == 0;
+*/
+int memset_s(void *dest, size_t destMax, int c, size_t count);
+
+/*@
+  assigns ((char*)p)[0..n-1];
+*/
+void BSL_SAL_CleanseData(void *p, unsigned int n);
+
+/*@
+  // ACSL 逻辑函数定义，用于描述 SM4 算法的数学性质
+  axiomatic SM4_Properties {
+    // 定义 SM4 S-盒变换的逻辑函数
+    logic integer sm4_sbox(integer input);
+    
+    // 定义循环左移操作
+    logic integer rotl32(integer x, integer n);
+    
+    // 定义 SM4 线性变换 L
+    logic integer sm4_l_transform(integer x);
+    
+    // 定义 SM4 轮函数 F
+    logic integer sm4_round_function(integer x0, integer x1, integer x2, integer x3, integer rk);
+    
+    // 定义完整的 SM4 加密变换
+    logic integer sm4_encrypt_block(integer x0, integer x1, integer x2, integer x3, uint32_t* rk);
+    
+    // 定义完整的 SM4 解密变换  
+    logic integer sm4_decrypt_block(integer x0, integer x1, integer x2, integer x3, uint32_t* rk);
+    
+    // 简化的结果函数用于 ACSL 规范
+    logic uint8_t sm4_encrypt_result(uint8_t* input, uint32_t* rk, integer pos);
+    logic uint8_t sm4_decrypt_result(uint8_t* input, uint32_t* rk, integer pos);
+  }
+*/
 
 /**
  * <<<: Cyclic shift to the left
@@ -79,14 +118,14 @@ static const uint32_t XBOX_1[] = {
     0x02028082, 0x7f7fa3dc, 0x5252c496, 0xebeb12f9, 0xd5d5a174, 0x3e3eb38d, 0xfcfcc33f, 0x9a9a3ea4,
     0x1d1d5b46, 0x1c1c1b07, 0x9e9e3ba5, 0xf3f30cff, 0xcfcf3ff0, 0xcdcdbf72, 0x5c5c4b17, 0xeaea52b8,
     0x0e0e8f81, 0x65653d58, 0xf0f0cc3c, 0x64647d19, 0x9b9b7ee5, 0x16169187, 0x3d3d734e, 0xa2a208aa,
-    0xa1a1c869, 0xadadc76a, 0x06068583, 0xcaca7ab0, 0xc5c5b570, 0x9191f465, 0x6b6bb2d9, 0x2e2ea789,
+    0xa1a1c869, 0xadadc76a, 0x06068583, 0xb0caca7a, 0xc5c5b570, 0x9191f465, 0x6b6bb2d9, 0x2e2ea789,
     0xe3e318fb, 0xafaf47e8, 0x3c3c330f, 0x2d2d674a, 0xc1c1b071, 0x59590e57, 0x7676e99f, 0xd4d4e135,
     0x7878661e, 0x9090b424, 0x3838360e, 0x7979265f, 0x8d8def62, 0x61613859, 0x474795d2, 0x8a8a2aa0,
     0x9494b125, 0x8888aa22, 0xf1f18c7d, 0xececd73b, 0x04040501, 0x8484a521, 0xe1e19879, 0x1e1e9b85,
     0x535384d7, 0x00000000, 0x19195e47, 0x5d5d0b56, 0x7e7ee39d, 0x4f4f9fd0, 0x9c9cbb27, 0x49491a53,
     0x31317c4d, 0xd8d8ee36, 0x08080a02, 0x9f9f7be4, 0x828220a2, 0x1313d4c7, 0x2323e8cb, 0x7a7ae69c,
     0xabab42e9, 0xfefe43bd, 0x2a2aa288, 0x4b4b9ad1, 0x01014041, 0x1f1fdbc4, 0xe0e0d838, 0xd6d661b7,
-    0x8e8e2fa1, 0xdfdf2bf4, 0xcbcb3af1, 0x3b3bf6cd, 0xe7e71dfa, 0x8585e560, 0x54544115, 0x868625a3,
+    0x8e8e2fa1, 0xdfdf2bf4, 0xcbcb3af1, 0x3b3bf6cd, 0xfae7e71d, 0x8585e560, 0x54544115, 0x868625a3,
     0x838360e3, 0xbaba16ac, 0x7575295c, 0x929234a6, 0x6e6ef799, 0xd0d0e434, 0x6868721a, 0x55550154,
     0xb6b619af, 0x4e4edf91, 0xc8c8fa32, 0xc0c0f030, 0xd7d721f6, 0x3232bc8e, 0xc6c675b3, 0x8f8f6fe0,
     0x7474691d, 0xdbdb2ef5, 0x8b8b6ae1, 0xb8b8962e, 0x0a0a8a80, 0x9999fe67, 0x2b2be2c9, 0x8181e061,
@@ -96,11 +135,11 @@ static const uint32_t XBOX_1[] = {
     0x3636b98f, 0x6c6c771b, 0xbebe13ad, 0x4a4ada90, 0xeeee57b9, 0x7777a9de, 0xf2f24cbe, 0xfdfd837e,
     0x44445511, 0x6767bdda, 0x71712c5d, 0x05054540, 0x7c7c631f, 0x40405010, 0x6969325b, 0x6363b8db,
     0x2828220a, 0x0707c5c2, 0xc4c4f531, 0x2222a88a, 0x969631a7, 0x3737f9ce, 0xeded977a, 0xf6f649bf,
-    0xb4b4992d, 0xd1d1a475, 0x434390d3, 0x48485a12, 0xe2e258ba, 0x979771e6, 0xd2d264b6, 0xc2c270b2,
+    0xb4b4992d, 0xa475d1d1, 0x434390d3, 0x48485a12, 0xe2e258ba, 0x979771e6, 0xd2d264b6, 0xc2c270b2,
     0x2626ad8b, 0xa5a5cd68, 0x5e5ecb95, 0x2929624b, 0x30303c0c, 0x5a5ace94, 0xddddab76, 0xf9f9867f,
-    0x9595f164, 0xe6e65dbb, 0xc7c735f2, 0x24242d09, 0x1717d1c6, 0xb9b9d66f, 0x1b1bdec5, 0x12129486,
-    0x60607818, 0xc3c330f3, 0xf5f5897c, 0xb3b35cef, 0xe8e8d23a, 0x7373acdf, 0x3535794c, 0x8080a020,
-    0xe5e59d78, 0xbbbb56ed, 0x7d7d235e, 0xf8f8c63e, 0x5f5f8bd4, 0x2f2fe7c8, 0xe4e4dd39, 0x21216849,
+    0x959595f1, 0xbbe6e65d, 0xf2c7c735, 0x0924242d, 0xc61717d1, 0x6fb9b9d6, 0xc51b1bde, 0x86121294,
+    0x18606078, 0xf3c3c330, 0x7cf5f589, 0xefb3b35c, 0x3ae8e8d2, 0xdf7373ac, 0x4c353579, 0x208080a0,
+    0x78e5e59d, 0xedbbbb56, 0x5e7d7d23, 0x3ef8f8c6, 0xd45f5f8b, 0xc82f2fe7, 0x39e4e4dd, 0x49212168,
 };
 
 /* XBOX_2[i] = XBOX_0[i] <<< 16 */
@@ -112,8 +151,8 @@ static const uint32_t XBOX_2[] = {
     0x72ec9e72, 0x094a4309, 0x41105141, 0xd324f7d3, 0x46d59346, 0xbf53ecbf, 0x62f89a62, 0xe9927be9,
     0xccff33cc, 0x51045551, 0x2c270b2c, 0x0d4f420d, 0xb759eeb7, 0x3ff3cc3f, 0xb21caeb2, 0x89ea6389,
     0x9374e793, 0xce7fb1ce, 0x706c1c70, 0xa60daba6, 0x27edca27, 0x20280820, 0xa348eba3, 0x56c19756,
-    0x02808202, 0x7fa3dc7f, 0x52c49652, 0xeb12f9eb, 0xd5a174d5, 0x3eb38d3e, 0xfcc33ffc, 0x9a3ea49a,
-    0x1d5b461d, 0x1c1b071c, 0x9e3ba59e, 0xf30cfff3, 0xcf3ff0cf, 0xcdbf72cd, 0x5c4b175c, 0xea52b8ea,
+    0x02808202, 0x7fa3dc7f, 0x52c49652, 0xeb12f9eb, 0xa174d5d5, 0xb38d3e3e, 0xc33ffcfc, 0x3ea49a9a,
+    0x5b461d1d, 0x1b071c1c, 0x9e3ba59e, 0xf30cfff3, 0xcf3ff0cf, 0xcdbf72cd, 0x5c4b175c, 0xea52b8ea,
     0x0e8f810e, 0x653d5865, 0xf0cc3cf0, 0x647d1964, 0x9b7ee59b, 0x16918716, 0x3d734e3d, 0xa208aaa2,
     0xa1c869a1, 0xadc76aad, 0x06858306, 0xca7ab0ca, 0xc5b570c5, 0x91f46591, 0x6bb2d96b, 0x2ea7892e,
     0xe318fbe3, 0xaf47e8af, 0x3c330f3c, 0x2d674a2d, 0xc1b071c1, 0x590e5759, 0x76e99f76, 0xd4e135d4,
@@ -122,21 +161,21 @@ static const uint32_t XBOX_2[] = {
     0x5384d753, 0x00000000, 0x195e4719, 0x5d0b565d, 0x7ee39d7e, 0x4f9fd04f, 0x9cbb279c, 0x491a5349,
     0x317c4d31, 0xd8ee36d8, 0x080a0208, 0x9f7be49f, 0x8220a282, 0x13d4c713, 0x23e8cb23, 0x7ae69c7a,
     0xab42e9ab, 0xfe43bdfe, 0x2aa2882a, 0x4b9ad14b, 0x01404101, 0x1fdbc41f, 0xe0d838e0, 0xd661b7d6,
-    0x8e2fa18e, 0xdf2bf4df, 0xcb3af1cb, 0x3bf6cd3b, 0xe71dfae7, 0x85e56085, 0x54411554, 0x8625a386,
-    0x8360e383, 0xba16acba, 0x75295c75, 0x9234a692, 0x6ef7996e, 0xd0e434d0, 0x68721a68, 0x55015455,
-    0xb619afb6, 0x4edf914e, 0xc8fa32c8, 0xc0f030c0, 0xd721f6d7, 0x32bc8e32, 0xc675b3c6, 0x8f6fe08f,
-    0x74691d74, 0xdb2ef5db, 0x8b6ae18b, 0xb8962eb8, 0x0a8a800a, 0x99fe6799, 0x2be2c92b, 0x81e06181,
-    0x03c0c303, 0xa48d29a4, 0x8caf238c, 0xae07a9ae, 0x34390d34, 0x4d1f524d, 0x39764f39, 0xbdd36ebd,
-    0x5781d657, 0x6fb7d86f, 0xdceb37dc, 0x15514415, 0x7ba6dd7b, 0xf709fef7, 0x3ab68c3a, 0xbc932fbc,
-    0x0c0f030c, 0xff03fcff, 0xa9c26ba9, 0xc9ba73c9, 0xb5d96cb5, 0xb1dc6db1, 0x6d375a6d, 0x45155045,
-    0x36b98f36, 0x6c771b6c, 0xbe13adbe, 0x4ada904a, 0xee57b9ee, 0x77a9de77, 0xf24cbef2, 0xfd837efd,
-    0x44551144, 0x67bdda67, 0x712c5d71, 0x05454005, 0x7c631f7c, 0x40501040, 0x69325b69, 0x63b8db63,
-    0x28220a28, 0x07c5c207, 0xc4f531c4, 0x22a88a22, 0x9631a796, 0x37f9ce37, 0xed977aed, 0xf649bff6,
-    0xb4992db4, 0xd1a475d1, 0x4390d343, 0x485a1248, 0xe258bae2, 0x9771e697, 0xd264b6d2, 0xc270b2c2,
-    0x26ad8b26, 0xa5cd68a5, 0x5ecb955e, 0x29624b29, 0x303c0c30, 0x5ace945a, 0xddab76dd, 0xf9867ff9,
-    0x95f16495, 0xe65dbbe6, 0xc735f2c7, 0x242d0924, 0x17d1c617, 0xb9d66fb9, 0x1bdec51b, 0x12948612,
-    0x60781860, 0xc330f3c3, 0xf5897cf5, 0xb35cefb3, 0xe8d23ae8, 0x73acdf73, 0x35794c35, 0x80a02080,
-    0xe59d78e5, 0xbb56edbb, 0x7d235e7d, 0xf8c63ef8, 0x5f8bd45f, 0x2fe7c82f, 0xe4dd39e4, 0x21684921,
+    0x2fa18e8e, 0x2bf4dfdf, 0x3af1cbcb, 0xf6cd3b3b, 0x1dfae7e7, 0xe5608585, 0x41155454, 0x25a38686,
+    0x60e38383, 0x16acbaba, 0x295c7575, 0x34a69292, 0xf7996e6e, 0xe434d0d0, 0x721a6868, 0x01545555,
+    0x19afb6b6, 0xdf914e4e, 0xfa32c8c8, 0xf030c0c0, 0x21f6d7d7, 0xbc8e3232, 0x75b3c6c6, 0x6fe08f8f,
+    0x691d7474, 0x2ef5dbdb, 0x6ae18b8b, 0x962eb8b8, 0x8a800a0a, 0xfe679999, 0xe2c92b2b, 0xe0618181,
+    0xc0c30303, 0x8d29a4a4, 0xaf238c8c, 0x07a9aeae, 0x390d3434, 0x1f524d4d, 0x764f3939, 0xd36ebdbd,
+    0x81d65757, 0xb7d86f6f, 0xeb37dcdc, 0x51441515, 0xa6dd7b7b, 0x09fef7f7, 0xb68c3a3a, 0x932fbcbc,
+    0x0f030c0c, 0x03fcffff, 0xc26ba9a9, 0xba73c9c9, 0xd96cb5b5, 0xdc6db1b1, 0x375a6d6d, 0x15504545,
+    0xb98f3636, 0x771b6c6c, 0x13adbebe, 0xda904a4a, 0x57b9eeee, 0xa9de7777, 0x4cbef2f2, 0x837efdfd,
+    0x55114444, 0xbdda6767, 0x2c5d7171, 0x45400505, 0x631f7c7c, 0x50104040, 0x325b6969, 0xb8db6363,
+    0x220a2828, 0xc5c20707, 0xf531c4c4, 0xa88a2222, 0x31a79696, 0xf9ce3737, 0x977aeded, 0x49bff6f6,
+    0x992db4b4, 0xd1a475d1, 0x90d34343, 0x5a124848, 0x58bae2e2, 0x71e69797, 0x64b6d2d2, 0x70b2c2c2,
+    0xad8b2626, 0xcd68a5a5, 0xcb955e5e, 0x624b2929, 0x3c0c3030, 0xce945a5a, 0xab76dddd, 0x867ff9f9,
+    0xf1649595, 0x5dbbe6e6, 0x35f2c7c7, 0x2d092424, 0xd1c61717, 0xd66fb9b9, 0xdec51b1b, 0x94861212,
+    0x78186060, 0x30f3c3c3, 0x897cf5f5, 0x5cefb3b3, 0xd23ae8e8, 0xacdf7373, 0x794c3535, 0xa0208080,
+    0x9d78e5e5, 0x56edbbbb, 0x235e7d7d, 0xc63ef8f8, 0x8bd45f5f, 0xe7c82f2f, 0xdde4e439, 0x68492121,
 };
 
 /* XBOX_3[i] = XBOX_0[i] <<< 24 */
@@ -168,11 +207,11 @@ static const uint32_t XBOX_3[] = {
     0xb98f3636, 0x771b6c6c, 0x13adbebe, 0xda904a4a, 0x57b9eeee, 0xa9de7777, 0x4cbef2f2, 0x837efdfd,
     0x55114444, 0xbdda6767, 0x2c5d7171, 0x45400505, 0x631f7c7c, 0x50104040, 0x325b6969, 0xb8db6363,
     0x220a2828, 0xc5c20707, 0xf531c4c4, 0xa88a2222, 0x31a79696, 0xf9ce3737, 0x977aeded, 0x49bff6f6,
-    0x992db4b4, 0xa475d1d1, 0x90d34343, 0x5a124848, 0x58bae2e2, 0x71e69797, 0x64b6d2d2, 0x70b2c2c2,
+    0x992db4b4, 0xd1a475d1, 0x90d34343, 0x5a124848, 0x58bae2e2, 0x71e69797, 0x64b6d2d2, 0x70b2c2c2,
     0xad8b2626, 0xcd68a5a5, 0xcb955e5e, 0x624b2929, 0x3c0c3030, 0xce945a5a, 0xab76dddd, 0x867ff9f9,
     0xf1649595, 0x5dbbe6e6, 0x35f2c7c7, 0x2d092424, 0xd1c61717, 0xd66fb9b9, 0xdec51b1b, 0x94861212,
     0x78186060, 0x30f3c3c3, 0x897cf5f5, 0x5cefb3b3, 0xd23ae8e8, 0xacdf7373, 0x794c3535, 0xa0208080,
-    0x9d78e5e5, 0x56edbbbb, 0x235e7d7d, 0xc63ef8f8, 0x8bd45f5f, 0xe7c82f2f, 0xdd39e4e4, 0x68492121,
+    0xe59d78e5, 0xbb56edbb, 0x7d235e7d, 0xf8c63ef8, 0x5f8bd45f, 0xe7c82f2f, 0xdd39e4e4, 0x68492121,
 };
 
 
@@ -214,6 +253,26 @@ static const uint32_t XBOX_3[] = {
     }
 
 /* enc is true: encrypt, enc is false: decrypt */
+/*@
+  // 内存安全性要求
+  requires \valid(out + (0..15));           // 输出缓冲区必须可写16字节
+  requires \valid_read(in + (0..15));       // 输入缓冲区必须可读16字节  
+  requires \valid_read(rk + (0..31));       // 轮密钥数组必须可读32个元素
+  requires \valid(x + (0..4));              // 工作数组必须可写5个元素
+  
+  // 内存分离性要求
+  requires \separated(out + (0..15), in + (0..15));     // 输入输出缓冲区不重叠
+  requires \separated(out + (0..15), rk + (0..31));     // 输出缓冲区与轮密钥不重叠
+  requires \separated(out + (0..15), x + (0..4));       // 输出缓冲区与工作数组不重叠
+  requires \separated(in + (0..15), x + (0..4));        // 输入缓冲区与工作数组不重叠
+  
+  // 函数只修改输出缓冲区和工作数组
+  assigns out[0..15], x[0..4];
+
+  // 功能性后置条件
+  ensures enc   ==> (\forall integer i; 0 <= i < 16 ==> out[i] == sm4_encrypt_result(in, rk, i));
+  ensures !enc  ==> (\forall integer i; 0 <= i < 16 ==> out[i] == sm4_decrypt_result(in, rk, i));
+*/
 static void SM4_Crypt(uint8_t *out, const uint8_t *in, const uint32_t *rk, uint32_t x[5], bool enc)
 {
     x[0] = GET_UINT32_BE(in, 0);  // x[0]: 4 bytes starting from index 0 of the in
@@ -235,6 +294,33 @@ static void SM4_Crypt(uint8_t *out, const uint8_t *in, const uint32_t *rk, uint3
     PUT_UINT32_BE(x[0], out, 12); // x[0] put into the 4 bytes starting from index 12 of the out
 }
 
+/*@
+  // 内存安全性要求
+  requires ctx == \null || \valid(ctx);                    // ctx 要么为空，要么指向有效对象
+  requires in == \null || \valid_read(in + (0..length-1)); // in 要么为空，要么可读 length 字节
+  requires out == \null || \valid(out + (0..length-1));    // out 要么为空，要么可写 length 字节
+  requires ctx != \null ==> \valid_read(ctx->rk + (0..31)); // 如果 ctx 非空，轮密钥必须可读
+  
+  // 长度要求
+  requires length <= UINT32_MAX;
+  
+  // 内存分离性要求（当指针非空时）
+  requires in != \null && out != \null ==> \separated(in + (0..length-1), out + (0..length-1));
+  requires ctx != \null && out != \null ==> \separated(ctx, out + (0..length-1));
+  requires ctx != \null && in != \null ==> \separated(ctx, in + (0..length-1));
+  
+  // 函数只修改输出缓冲区
+  assigns out[0..length-1];
+  
+  // 错误处理的后置条件
+  ensures ctx == \null || in == \null || out == \null || length == 0 ==> 
+    \result == CRYPT_NULL_INPUT;
+  ensures length % CRYPT_SM4_BLOCKSIZE != 0 ==> 
+    \result == CRYPT_SM4_ERR_MSG_LEN;
+  ensures ctx != \null && in != \null && out != \null && length > 0 && 
+          length % CRYPT_SM4_BLOCKSIZE == 0 ==> 
+    \result == CRYPT_SUCCESS;
+*/
 static int32_t CRYPT_SM4_Crypt(CRYPT_SM4_Ctx *ctx, const uint8_t *in, uint8_t *out, uint32_t length, bool enc)
 {
     if (ctx == NULL || in == NULL || out == NULL || length == 0) {
@@ -249,7 +335,16 @@ static int32_t CRYPT_SM4_Crypt(CRYPT_SM4_Ctx *ctx, const uint8_t *in, uint8_t *o
 
     uint32_t x[5];          // Used as a temporary variable.
     uint32_t blocks = length / CRYPT_SM4_BLOCKSIZE;
+    /*@
+      // 循环不变量
+      loop invariant 0 <= i <= blocks;
+      loop assigns i, out[0..length-1], x[0..4];
+      loop variant blocks - i;
+    */
     for (uint32_t i = 0; i < blocks; i++) {
+        /*@
+          assigns out[i * CRYPT_SM4_BLOCKSIZE .. (i+1) * CRYPT_SM4_BLOCKSIZE - 1], x[0..4];
+        */
         SM4_Crypt(out + i * CRYPT_SM4_BLOCKSIZE, in + i * CRYPT_SM4_BLOCKSIZE, ctx->rk, x, enc);
     }
 
@@ -260,16 +355,69 @@ static int32_t CRYPT_SM4_Crypt(CRYPT_SM4_Ctx *ctx, const uint8_t *in, uint8_t *o
     return CRYPT_SUCCESS;
 }
 
+/*@
+  // 内存安全性要求
+  requires ctx == \null || \valid(ctx);
+  requires in == \null || \valid_read(in + (0..length-1));
+  requires out == \null || \valid(out + (0..length-1));
+  requires ctx != \null ==> \valid_read(ctx->rk + (0..31));
+  
+  // 内存分离性要求
+  requires in != \null && out != \null ==> \separated(in + (0..length-1), out + (0..length-1));
+  requires ctx != \null && out != \null ==> \separated(ctx, out + (0..length-1));
+  
+  // 函数只修改输出缓冲区
+  assigns out[0..length-1];
+  
+  // 错误处理
+  ensures ctx == \null || in == \null || out == \null || length == 0 ==> 
+    \result == CRYPT_NULL_INPUT;
+  ensures length % CRYPT_SM4_BLOCKSIZE != 0 ==> 
+    \result == CRYPT_SM4_ERR_MSG_LEN;
+  ensures ctx != \null && in != \null && out != \null && length > 0 && 
+          length % CRYPT_SM4_BLOCKSIZE == 0 ==> 
+    \result == CRYPT_SUCCESS;
+*/
 int32_t CRYPT_SM4_Encrypt(CRYPT_SM4_Ctx *ctx, const uint8_t *in, uint8_t *out, uint32_t length)
 {
     return CRYPT_SM4_Crypt(ctx, in, out, length, true);
 }
 
+/*@
+  // 内存安全性要求
+  requires ctx == \null || \valid(ctx);
+  requires in == \null || \valid_read(in + (0..length-1));
+  requires out == \null || \valid(out + (0..length-1));
+  requires ctx != \null ==> \valid_read(ctx->rk + (0..31));
+  
+  // 内存分离性要求
+  requires in != \null && out != \null ==> \separated(in + (0..length-1), out + (0..length-1));
+  requires ctx != \null && out != \null ==> \separated(ctx, out + (0..length-1));
+  
+  // 函数只修改输出缓冲区
+  assigns out[0..length-1];
+  
+  // 错误处理
+  ensures ctx == \null || in == \null || out == \null || length == 0 ==> 
+    \result == CRYPT_NULL_INPUT;
+  ensures length % CRYPT_SM4_BLOCKSIZE != 0 ==> 
+    \result == CRYPT_SM4_ERR_MSG_LEN;
+  ensures ctx != \null && in != \null && out != \null && length > 0 && 
+          length % CRYPT_SM4_BLOCKSIZE == 0 ==> 
+    \result == CRYPT_SUCCESS;
+*/
 int32_t CRYPT_SM4_Decrypt(CRYPT_SM4_Ctx *ctx, const uint8_t *in, uint8_t *out, uint32_t length)
 {
     return CRYPT_SM4_Crypt(ctx, in, out, length, false);
 }
 
+/*@
+  // 内存安全性要求：ctx 要么为空，要么指向有效的 CRYPT_SM4_Ctx 对象
+  requires ctx == \null || \valid(ctx);
+  
+  // 函数可能修改 ctx 指向的内容
+  assigns *ctx;
+*/
 void CRYPT_SM4_Clean(CRYPT_SM4_Ctx *ctx)
 {
     if (ctx == NULL) {

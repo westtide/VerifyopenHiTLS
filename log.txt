@@ -1,0 +1,63 @@
+time frama-c -wp -rte -cpp-extra-args="-DHITLS_CRYPTO_SM3 -I ./include/bsl -I ./include/crypto -I ./bsl/err/include -I ./crypto/include -I ./config/macro_config -I ./config -I ./include -I ./sm3/include" -wp-prover z3 sm3/src/noasm_sm3_count1.c
+[kernel] Parsing sm3/src/noasm_sm3_count1.c (with preprocessing)
+[kernel] sm3/src/noasm_sm3_count1.c:202: Warning: 
+  parsing obsolete ACSL construct 'logic declaration'. 'an axiomatic block' should be used instead.
+[kernel] sm3/src/noasm_sm3_count1.c:205: Warning: 
+  parsing obsolete ACSL construct 'logic declaration'. 'an axiomatic block' should be used instead.
+[kernel] sm3/src/noasm_sm3_count1.c:208: Warning: 
+  parsing obsolete ACSL construct 'logic declaration'. 'an axiomatic block' should be used instead.
+[rte:annot] annotating function SM3_Compress
+[wp] 353 goals scheduled
+[wp] [Timeout] typed_SM3_Compress_ensures (Qed 123ms) (Z3)
+[wp] Proved goals:  354 / 355
+  Terminating:     1
+  Unreachable:     1
+  Qed:           269 (123ms-1.7s-55.3s)
+  Z3 4.13.4:      83 (9ms-15ms)
+  Timeout:         1
+frama-c -wp -rte  -wp-prover z3 sm3/src/noasm_sm3_count1.c  873.45s user 9.78s system 97% cpu 15:03.93 total
+
+
+[wp] [Timeout] typed_GetUintCtrl_assert_rte_mem_access (Qed 3ms) (Z3) (Stronger)
+[wp] Proved goals:  360 / 383
+  Terminating:     3
+  Unreachable:     5
+  Qed:           269 (1ms-797ms-26s)
+  Z3 4.13.0:      83 (26ms-37ms-50ms)
+  Timeout:        22
+  Unknown:         1
+[wp:pedantic-assigns] crypto/include/crypt_utils.h:341: Warning: 
+  No 'assigns' specification for function 'Uint64FromBeBytes'.
+  Callers assumptions might be imprecise.
+[wp:pedantic-assigns] crypto/include/crypt_utils.h:353: Warning: 
+  No 'assigns' specification for function 'Uint64ToBeBytes'.
+  Callers assumptions might be imprecise.
+[wp:pedantic-assigns] crypto/include/crypt_utils.h:369: Warning: 
+  No 'assigns' specification for function 'ParamIdIsValid'.
+  Callers assumptions might be imprecise.
+[wp:pedantic-assigns] crypto/include/crypt_utils.h:380: Warning: 
+  No 'assigns' specification for function 'GetUintCtrl'.
+  Callers assumptions might be imprecise.
+frama-c -wp -rte  -wp-prover z3 sm3/src/noasm_sm3_count1.c  765.95s user 3.37s system 104% cpu 12:18.52 total
+
+
+[wp] [Timeout] typed_GetUintCtrl_assert_rte_mem_access (Qed 4ms) (Alt-Ergo) (Stronger)
+[wp] Proved goals:  360 / 383
+  Terminating:       3
+  Unreachable:       5
+  Qed:             269 (1ms-804ms-26s)
+  Alt-Ergo 2.6.0:   83 (35ms-259ms-659ms)
+  Timeout:          23
+[wp:pedantic-assigns] crypto/include/crypt_utils.h:341: Warning: 
+  No 'assigns' specification for function 'Uint64FromBeBytes'.
+  Callers assumptions might be imprecise.
+[wp:pedantic-assigns] crypto/include/crypt_utils.h:353: Warning: 
+  No 'assigns' specification for function 'Uint64ToBeBytes'.
+  Callers assumptions might be imprecise.
+[wp:pedantic-assigns] crypto/include/crypt_utils.h:369: Warning: 
+  No 'assigns' specification for function 'ParamIdIsValid'.
+  Callers assumptions might be imprecise.
+[wp:pedantic-assigns] crypto/include/crypt_utils.h:380: Warning: 
+  No 'assigns' specification for function 'GetUintCtrl'.
+  Callers assumptions might be imprecise.
+frama-c -wp -rte  sm3/src/noasm_sm3_count1.c  790.07s user 3.69s system 106% cpu 12:24.11 total
