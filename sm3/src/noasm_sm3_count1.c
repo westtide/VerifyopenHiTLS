@@ -1,4 +1,8 @@
 /*
+ivette -wp -rte \
+  -cpp-extra-args="-DHITLS_CRYPTO_SM3 -I ./include/bsl -I ./include/crypto -I ./bsl/err/include  -I ./crypto/include  -I ./config/macro_config -I ./config -I ./include -I ./sm3/include" \
+  sm3/src/noasm_sm3_count1.c
+
  * This file is part of the openHiTLS project.
  *
  * openHiTLS is licensed under the Mulan PSL v2.
@@ -92,16 +96,13 @@
 
 /*@
   // 用logic定义ROTL32（32位循环左移），确保在ACSL中可以使用
-  logic integer ROTL32_Logic(integer x, integer n) =
-    ((x << n) | ((x >> (32 - n)) & ((1 << n) - 1))) & 0xFFFFFFFF;
+  logic integer ROTL32_Logic(integer x, integer n) = ((x << n) | ((x >> (32 - n)) & ((1 << n) - 1))) & 0xFFFFFFFF;
 
   // P0由ROTL32定义
-  logic integer P0_Logic(integer x) =
-    (x ^ ROTL32_Logic(x, 9) ^ ROTL32_Logic(x, 17)) & 0xFFFFFFFF;
+  logic integer P0_Logic(integer x) = (x ^ ROTL32_Logic(x, 9) ^ ROTL32_Logic(x, 17)) & 0xFFFFFFFF;
 
     // P1由ROTL32定义
-  logic integer P1_Logic(integer x) =
-    (x ^ ROTL32_Logic(x, 15) ^ ROTL32_Logic(x, 23)) & 0xFFFFFFFF;
+  logic integer P1_Logic(integer x) = (x ^ ROTL32_Logic(x, 15) ^ ROTL32_Logic(x, 23)) & 0xFFFFFFFF;
 */
 #define P0(x) ((x) ^ ROTL32((x), 9) ^ ROTL32((x), 17))
 #define P1(x) ((x) ^ ROTL32((x), 15) ^ ROTL32((x), 23))
@@ -109,17 +110,11 @@
 /*@
   // 以下是SM3中的四个布尔函数FF和GG
   // FF函数拆分为FF0和FF1
-  logic integer FF0_Logic(integer x, integer y, integer z) =
-    (x ^ y ^ z) & 0xFFFFFFFF;
-  logic integer FF1_Logic(integer x, integer y, integer z) =
-    ((x & y) | (x & z) | (y & z)) & 0xFFFFFFFF;
-
+  logic integer FF0_Logic(integer x, integer y, integer z) = (x ^ y ^ z) & 0xFFFFFFFF;
+  logic integer FF1_Logic(integer x, integer y, integer z) = ((x & y) | (x & z) | (y & z)) & 0xFFFFFFFF;
   // GG函数拆分为GG0和GG1
-  logic integer GG0_Logic(integer x, integer y, integer z) =
-    (x ^ y ^ z) & 0xFFFFFFFF;
-
-  logic integer GG1_Logic(integer x, integer y, integer z) =
-    ((x & y) | ((~x) & z)) & 0xFFFFFFFF;
+  logic integer GG0_Logic(integer x, integer y, integer z) = (x ^ y ^ z) & 0xFFFFFFFF;
+  logic integer GG1_Logic(integer x, integer y, integer z) = ((x & y) | (~x & z)) & 0xFFFFFFFF;
 */
 #define FF0(x, y, z) ((x) ^ (y) ^ (z))
 #define FF1(x, y, z) (((x) & (y)) | ((x) & (z)) | ((y) & (z)))
@@ -132,54 +127,119 @@
   但是FF、GG是传入时决定FF0、FF1、GG0、GG1的
   因此ROUND不写logic，需要单独写ROUND00_15和ROUND16_63
 */
-#define ROUND(A, B, C, D, E, F, G, H, K, FF, GG, Wj, Wi)     \
-    do                                                       \
-    {                                                        \
-        uint32_t a12 = ROTL32((A), 12);                      \
-        uint32_t ss1 = ROTL32(a12 + (E) + (K), 7);           \
-        uint32_t ss2 = ss1 ^ a12;                            \
-        uint32_t tt1 = FF((A), (B), (C)) + (D) + ss2 + (Wi); \
-        uint32_t tt2 = GG((E), (F), (G)) + (H) + ss1 + (Wj); \
-        (H) = tt1;                                           \
-        (D) = P0(tt2);                                       \
-        (B) = ROTL32((B), 9);                                \
-        (F) = ROTL32((F), 19);                               \
-    } while (0)
+#define ROUND(A, B, C, D, E, F, G, H, K, FF, GG, Wj, Wi) \
+  do                                                     \
+  {                                                      \
+    uint32_t a12 = ROTL32((A), 12);                      \
+    uint32_t ss1 = ROTL32(a12 + (E) + (K), 7);           \
+    uint32_t ss2 = ss1 ^ a12;                            \
+    uint32_t tt1 = FF((A), (B), (C)) + (D) + ss2 + (Wi); \
+    uint32_t tt2 = GG((E), (F), (G)) + (H) + ss1 + (Wj); \
+    (H) = tt1;                                           \
+    (D) = P0(tt2);                                       \
+    (B) = ROTL32((B), 9);                                \
+    (F) = ROTL32((F), 19);                               \
+  } while (0)
 
 /*@
-// ROUND00_15的logic函数（使用FF0和GG0）
-  logic void ROUND00_15_logic(integer* A, integer* B, integer* C, integer* D,
-                                 integer* E, integer* F, integer* G, integer* H,
-                                 integer K, integer Wj, integer Wi) =
-    integer a12 = ROTL32_Logic(*A, 12);
-    integer ss1 = ROTL32_Logic(a12 + *E + K, 7);
-    integer ss2 = ss1 ^ a12;
-    integer tt1 = FF0_Logic(*A, *B, *C) + *D + ss2 + Wi;
-    integer tt2 = GG0_Logic(*E, *F, *G) + *H + ss1 + Wj;
-    *H = tt1 & 0xFFFFFFFF,
-    *D = P0_Logic(tt2) & 0xFFFFFFFF,
-    *B = ROTL32_Logic(*B, 9),
-    *F = ROTL32_Logic(*F, 19);
+  // 公理定义GetUint32Be
+  axiomatic GetUint32Be {
+  logic integer get_uint32_be_logic( unsigned char* p, integer i);
+  axiom get_uint32_be_def:
+    \forall  unsigned char* p, integer i; \valid_read(p + (i .. i+3)) ==>
+      get_uint32_be_logic(p,i) ==
+        (((integer)p[i]   << 24) |
+         ((integer)p[i+1] << 16) |
+         ((integer)p[i+2] <<  8) |
+         ((integer)p[i+3]));
+  }
 
-  // ROUND16_63的logic函数（使用FF1和GG1）
-  logic void ROUND16_63_logic(integer* A, integer* B, integer* C, integer* D,
-                                 integer* E, integer* F, integer* G, integer* H,
-                                 integer K, integer Wj, integer Wi) =
-    integer a12 = ROTL32_Logic(*A, 12);
-    integer ss1 = ROTL32_Logic(a12 + *E + K, 7);
-    integer ss2 = ss1 ^ a12;
-    integer tt1 = FF1_Logic(*A, *B, *C) + *D + ss2 + Wi;
-    integer tt2 = GG1_Logic(*E, *F, *G) + *H + ss1 + Wj;
-    *H = tt1 & 0xFFFFFFFF,
-    *D = P0_Logic(tt2) & 0xFFFFFFFF,
-    *B = ROTL32_Logic(*B, 9),
-    *F = ROTL32_Logic(*F, 19);
+  axiomatic SM3Types {
+    // 用于存放一轮计算后更新的四个寄存器的值
+    type Round_Update_Values = struct {
+      integer new_b; 
+      integer new_d; 
+      integer new_f; 
+      integer new_h;
+    };
+    
+    type SM3_State = struct {
+      integer a; integer b; integer c; integer d;
+      integer e; integer f; integer g; integer h;
+    };
+  }
+
+  logic Round_Update_Values
+  Compute_Round_Update_Logic(integer A, integer B, integer C, integer D,
+                             integer E, integer F, integer G, integer H,
+                             integer K, integer Wj, integer Wi, boolean is_ff0_gg0) =
+    \let a12 = ROTL32_Logic(A, 12) in
+    \let ss1 = ROTL32_Logic((a12 + E + K) & 0xFFFFFFFF, 7) in
+    \let ss2 = ss1 ^ a12 in
+    \let tt1 = (is_ff0_gg0 ? FF0_Logic(A, B, C) : FF1_Logic(A, B, C)) + D + ss2 + Wi in
+    \let tt2 = (is_ff0_gg0 ? GG0_Logic(E, F, G) : GG1_Logic(E, F, G)) + H + ss1 + Wj in
+    (Round_Update_Values) { new_b = tt1; new_d = tt2; new_f = ss1; new_h = ss2 };
+
+
+  logic SM3_State State_from_array(uint32_t* s) =
+    (SM3_State) { a = s[0]; b = s[1]; c = s[2]; d = s[3];
+                  e = s[4]; f = s[5]; g = s[6]; h = s[7] };
+
+  predicate State_equals_array(SM3_State ls, uint32_t* cs) =
+    (ls.a == cs[0]) && (ls.b == cs[1]) && (ls.c == cs[2]) && (ls.d == cs[3]) &&
+    (ls.e == cs[4]) && (ls.f == cs[5]) && (ls.g == cs[6]) && (ls.h == cs[7]);
+
+  // 为消息扩展(W和W')建立逻辑模型。为简化，这里使用公理化声明。
+  // 一个完整的证明需要将此处的公理替换为具体的递归逻辑函数定义。
+  axiomatic MessageExpansion {
+      logic integer W_logic(integer j,  uint8_t* block);
+      logic integer W_prime_logic(integer j,  uint8_t* block);
+  }
+
+  // 递归地模拟单个块的64轮置换过程
+  logic SM3_State SM3_Permutation_Recursive(SM3_State s, uint8_t* block, integer j) =
+    j == 64 ? s :
+    let K = (0 <= j && j <= 15) ? 0x79cc4519 : 0x7a879d8a in
+    let a12 = ROTL32_Logic(s.a, 12) in
+    let ss1 = ROTL32_Logic((a12 + s.e + K) & 0xFFFFFFFF, 7) in
+    let ss2 = ss1 ^ a12 in
+    let is_j_0_15 = 0 <= j && j <= 15 in
+    let ff = is_j_0_15 ? FF0_Logic(s.a, s.b, s.c) : FF1_Logic(s.a, s.b, s.c) in
+    let gg = is_j_0_15 ? GG0_Logic(s.e, s.f, s.g) : GG1_Logic(s.e, s.f, s.g) in
+    let tt1 = (ff + s.d + ss2 + W_prime_logic(j, block)) & 0xFFFFFFFF in
+    let tt2 = (gg + s.h + ss1 + W_logic(j, block)) & 0xFFFFFFFF in
+    let next_s = { a = tt1; b = s.a; c = ROTL32_Logic(s.b, 9); d = s.c;
+                   e = P0_Logic(tt2); f = s.e; g = ROTL32_Logic(s.f, 19); h = s.g } in
+    SM3_Permutation_Recursive(next_s, block, j + 1);
+  
+
+  // 模拟对单个512位消息块的完整压缩函数(CF)
+  logic SM3_State SM3_Process_Block(SM3_State initial_s, const uint8_t* block) {
+      SM3_State final_permuted_s = SM3_Permutation_Recursive(initial_s, block, 0);
+      return (SM3_State) {
+          .a = (initial_s.a ^ final_permuted_s.a) & 0xFFFFFFFF,
+          .b = (initial_s.b ^ final_permuted_s.b) & 0xFFFFFFFF,
+          .c = (initial_s.c ^ final_permuted_s.c) & 0xFFFFFFFF,
+          .d = (initial_s.d ^ final_permuted_s.d) & 0xFFFFFFFF,
+          .e = (initial_s.e ^ final_permuted_s.e) & 0xFFFFFFFF,
+          .f = (initial_s.f ^ final_permuted_s.f) & 0xFFFFFFFF,
+          .g = (initial_s.g ^ final_permuted_s.g) & 0xFFFFFFFF,
+          .h = (initial_s.h ^ final_permuted_s.h) & 0xFFFFFFFF
+      };
+  }
+
+  // 顶层递归逻辑函数，模拟对所有数据块的迭代压缩
+  logic SM3_State SM3_Compression_Full(SM3_State s, const uint8_t* data, integer num_blocks) {
+      if (num_blocks <= 0) return s;
+      SM3_State new_s = SM3_Process_Block(s, data);
+      return SM3_Compression_Full(new_s, data + 64, num_blocks - 1);
+  }
 */
 #define ROUND00_15(A, B, C, D, E, F, G, H, K, Wj, Wi) \
-    ROUND(A, B, C, D, E, F, G, H, K, FF0, GG0, Wj, Wi)
+  ROUND(A, B, C, D, E, F, G, H, K, FF0, GG0, Wj, Wi)
 
 #define ROUND16_63(A, B, C, D, E, F, G, H, K, Wj, Wi) \
-    ROUND(A, B, C, D, E, F, G, H, K, FF1, GG1, Wj, Wi)
+  ROUND(A, B, C, D, E, F, G, H, K, FF1, GG1, Wj, Wi)
 
 /*@
   logic integer EXPAND_Logic(integer W1, integer W2, integer W3,
@@ -187,235 +247,204 @@
     (P1_Logic(W1 ^ W2 ^ ROTL32_Logic(W3, 15)) ^ ROTL32_Logic(W4, 7) ^ W5) & 0xFFFFFFFF;
 */
 #define EXPAND(W1, W2, W3, W4, W5) \
-    (P1((W1) ^ (W2) ^ ROTL32((W3), 15)) ^ ROTL32((W4), 7) ^ (W5))
+  (P1((W1) ^ (W2) ^ ROTL32((W3), 15)) ^ ROTL32((W4), 7) ^ (W5))
 
-/* see the GM standard document GM/T 0004-2012 chapter 5.3.3 */
 /*@
-  // 定义在crypto/include/crypt_utils.h：将从 p + offset 开始的 4 个字节按大端组合为 uint32_t（32位无符号整数）
-  logic integer GET_UINT32_Logic(uint8_t* p, integer offset) =
-      ((p[offset + 0] << 24) |
-      (p[offset + 1] << 16) |
-      (p[offset + 2] << 8)  |
-      (p[offset + 3])) & 0xFFFFFFFF;
-
-  logic void SM3_Compress_Logic(uint32_t state[8], const uint8_t *data, uint32_t blockCnt) =
-    integer input = data;
-   integer w[ 0] = GET_UINT32_Logic(input,  0),
-           w[ 1] = GET_UINT32_Logic(input,  4),
-           w[ 2] = GET_UINT32_Logic(input,  8),
-            w[ 3] = GET_UINT32_Logic(input, 12),
-            w[ 4] = GET_UINT32_Logic(input, 16),
-            w[ 5] = GET_UINT32_Logic(input, 20),
-            w[ 6] = GET_UINT32_Logic(input, 24),
-            w[ 7] = GET_UINT32_Logic(input, 28),
-            w[ 8] = GET_UINT32_Logic(input, 32),
-            w[ 9] = GET_UINT32_Logic(input, 36),
-            w[10] = GET_UINT32_Logic(input, 40),
-            w[11] = GET_UINT32_Logic(input, 44),
-            w[12] = GET_UINT32_Logic(input, 48),
-            w[13] = GET_UINT32_Logic(input, 52),
-            w[14] = GET_UINT32_Logic(input, 56),
-            w[15] = GET_UINT32_Logic(input, 60);
-
-    integer a = state[0],
-    b = state[1],
-    c = state[2],
-    d = state[3],
-    e = state[4],
-    f = state[5],
-    g = state[6],
-    h = state[7];
-
-    ROUND00_15_logic(a, b, c, d, e, f, g, h, K0, w[0], w[0] ^ w[4], FF0, GG0, &h, &d, &b, &f),
-
-
-
-*/
-/*@
+  // 内存安全：确保 state 指针指向一个有效的、可写的8个uint32_t大小的内存区域
   requires \valid(state + (0..7));
-  // blockCnt == 0 implies data is not read, so no need for \valid_read on data for this case
+  // 内存安全：只有在有数据块需要处理时，才要求 data 指针是可读的
   requires blockCnt > 0 ==> \valid_read(data + (0 .. blockCnt * 64 - 1));
-  requires \separated(state + (0..7), data + (0 .. blockCnt * 64 - 1));
-
-  assigns state[0..7]; // State is modified in general, even if not for blockCnt == 0
-
+  // 内存安全：确保 state 和 data 指向的内存区域没有重叠，防止数据损坏
+  requires \separated(state + (0..7), data + (0.. blockCnt * 64 - 1));
+  // 内存安全：该函数唯一允许修改的内存是 state 数组
+  assigns state[0..7];
+  // 若没有数据块要处理，则 state 数组不变
   ensures blockCnt == 0 ==>
     (\forall integer i; 0 <= i <= 7 ==> state[i] == \old(state[i]));
-  // If blockCnt is 0, 'count' (local var) will be 0, not relevant as a post-condition for the state
+  // 若 blockCnt == 1，验证 state 的正确性
+  ensures blockCnt == 1 ==>
+    (\forall integer i; 0 <= i <= 7 ==> state[i] == \old(state[i]) ^ some_transformation(data, i));
 */
 void SM3_Compress(uint32_t state[8], const uint8_t *data, uint32_t blockCnt)
 {
-    uint32_t w[16] = {0};
-    const uint8_t *input = data;
-    uint32_t count = blockCnt;
+  uint32_t w[16] = {0};
+  const uint8_t *input = data;
+  uint32_t count = blockCnt;
 
-    while (count > 0)
-    {
-        // loop invariant 要写
-        // frama-c 的性能问题：@assert 缓解
-        /* converts data to 32 bits for calculation */
-        w[0] = GET_UINT32_BE(input, 0);
-        w[1] = GET_UINT32_BE(input, 4);
-        w[2] = GET_UINT32_BE(input, 8);
-        w[3] = GET_UINT32_BE(input, 12);
-        w[4] = GET_UINT32_BE(input, 16);
-        w[5] = GET_UINT32_BE(input, 20);
-        w[6] = GET_UINT32_BE(input, 24);
-        w[7] = GET_UINT32_BE(input, 28);
-        w[8] = GET_UINT32_BE(input, 32);
-        w[9] = GET_UINT32_BE(input, 36);
-        w[10] = GET_UINT32_BE(input, 40);
-        w[11] = GET_UINT32_BE(input, 44);
-        w[12] = GET_UINT32_BE(input, 48);
-        w[13] = GET_UINT32_BE(input, 52);
-        w[14] = GET_UINT32_BE(input, 56);
-        w[15] = GET_UINT32_BE(input, 60);
+  while (count > 0)
+  {
 
-        uint32_t a = state[0];
-        uint32_t b = state[1];
-        uint32_t c = state[2];
-        uint32_t d = state[3];
-        uint32_t e = state[4];
-        uint32_t f = state[5];
-        uint32_t g = state[6];
-        uint32_t h = state[7];
+    /*@
+      // 计数器不变量: count 的值在 0 和初始 blockCnt 之间
+      loop invariant 0 <= count <= \at(blockCnt, Pre);
+      // 指针不变量: input 指针总是正确地指向当前待处理的数据块
+      loop invariant input == \at(data, Pre) + (\at(blockCnt, Pre) - count) * 64;
+      // 赋值声明
+      loop assigns count, input, state[0..7], w[0..15];
+      // 循环遍体：会终止
+      loop variant count;
+    */
 
-        // 0 ~ 15 round
-        ROUND00_15(a, b, c, d, e, f, g, h, K0, w[0], w[0] ^ w[4]);
-        ROUND00_15(h, a, b, c, d, e, f, g, K1, w[1], w[1] ^ w[5]);
-        ROUND00_15(g, h, a, b, c, d, e, f, K2, w[2], w[2] ^ w[6]);
-        ROUND00_15(f, g, h, a, b, c, d, e, K3, w[3], w[3] ^ w[7]);
-        ROUND00_15(e, f, g, h, a, b, c, d, K4, w[4], w[4] ^ w[8]);
-        ROUND00_15(d, e, f, g, h, a, b, c, K5, w[5], w[5] ^ w[9]);
-        ROUND00_15(c, d, e, f, g, h, a, b, K6, w[6], w[6] ^ w[10]);
-        ROUND00_15(b, c, d, e, f, g, h, a, K7, w[7], w[7] ^ w[11]);
-        ROUND00_15(a, b, c, d, e, f, g, h, K8, w[8], w[8] ^ w[12]);
-        ROUND00_15(h, a, b, c, d, e, f, g, K9, w[9], w[9] ^ w[13]);
-        ROUND00_15(g, h, a, b, c, d, e, f, K10, w[10], w[10] ^ w[14]);
-        ROUND00_15(f, g, h, a, b, c, d, e, K11, w[11], w[11] ^ w[15]);
-        w[0] = EXPAND(w[0], w[7], w[13], w[3], w[10]);
-        ROUND00_15(e, f, g, h, a, b, c, d, K12, w[12], w[12] ^ w[0]);
-        w[1] = EXPAND(w[1], w[8], w[14], w[4], w[11]);
-        ROUND00_15(d, e, f, g, h, a, b, c, K13, w[13], w[13] ^ w[1]);
-        w[2] = EXPAND(w[2], w[9], w[15], w[5], w[12]);
-        ROUND00_15(c, d, e, f, g, h, a, b, K14, w[14], w[14] ^ w[2]);
-        w[3] = EXPAND(w[3], w[10], w[0], w[6], w[13]);
-        ROUND00_15(b, c, d, e, f, g, h, a, K15, w[15], w[15] ^ w[3]);
+    w[0] = GET_UINT32_BE(input, 0);
+    w[1] = GET_UINT32_BE(input, 4);
+    w[2] = GET_UINT32_BE(input, 8);
+    w[3] = GET_UINT32_BE(input, 12);
+    w[4] = GET_UINT32_BE(input, 16);
+    w[5] = GET_UINT32_BE(input, 20);
+    w[6] = GET_UINT32_BE(input, 24);
+    w[7] = GET_UINT32_BE(input, 28);
+    w[8] = GET_UINT32_BE(input, 32);
+    w[9] = GET_UINT32_BE(input, 36);
+    w[10] = GET_UINT32_BE(input, 40);
+    w[11] = GET_UINT32_BE(input, 44);
+    w[12] = GET_UINT32_BE(input, 48);
+    w[13] = GET_UINT32_BE(input, 52);
+    w[14] = GET_UINT32_BE(input, 56);
+    w[15] = GET_UINT32_BE(input, 60);
 
-        // 16 ~ 63 round
-        w[4] = EXPAND(w[4], w[11], w[1], w[7], w[14]);
-        ROUND16_63(a, b, c, d, e, f, g, h, K16, w[0], w[0] ^ w[4]);
-        w[5] = EXPAND(w[5], w[12], w[2], w[8], w[15]);
-        ROUND16_63(h, a, b, c, d, e, f, g, K17, w[1], w[1] ^ w[5]);
-        w[6] = EXPAND(w[6], w[13], w[3], w[9], w[0]);
-        ROUND16_63(g, h, a, b, c, d, e, f, K18, w[2], w[2] ^ w[6]);
-        w[7] = EXPAND(w[7], w[14], w[4], w[10], w[1]);
-        ROUND16_63(f, g, h, a, b, c, d, e, K19, w[3], w[3] ^ w[7]);
-        w[8] = EXPAND(w[8], w[15], w[5], w[11], w[2]);
-        ROUND16_63(e, f, g, h, a, b, c, d, K20, w[4], w[4] ^ w[8]);
-        w[9] = EXPAND(w[9], w[0], w[6], w[12], w[3]);
-        ROUND16_63(d, e, f, g, h, a, b, c, K21, w[5], w[5] ^ w[9]);
-        w[10] = EXPAND(w[10], w[1], w[7], w[13], w[4]);
-        ROUND16_63(c, d, e, f, g, h, a, b, K22, w[6], w[6] ^ w[10]);
-        w[11] = EXPAND(w[11], w[2], w[8], w[14], w[5]);
-        ROUND16_63(b, c, d, e, f, g, h, a, K23, w[7], w[7] ^ w[11]);
-        w[12] = EXPAND(w[12], w[3], w[9], w[15], w[6]);
-        ROUND16_63(a, b, c, d, e, f, g, h, K24, w[8], w[8] ^ w[12]);
-        w[13] = EXPAND(w[13], w[4], w[10], w[0], w[7]);
-        ROUND16_63(h, a, b, c, d, e, f, g, K25, w[9], w[9] ^ w[13]);
-        w[14] = EXPAND(w[14], w[5], w[11], w[1], w[8]);
-        ROUND16_63(g, h, a, b, c, d, e, f, K26, w[10], w[10] ^ w[14]);
-        w[15] = EXPAND(w[15], w[6], w[12], w[2], w[9]);
-        ROUND16_63(f, g, h, a, b, c, d, e, K27, w[11], w[11] ^ w[15]);
-        w[0] = EXPAND(w[0], w[7], w[13], w[3], w[10]);
-        ROUND16_63(e, f, g, h, a, b, c, d, K28, w[12], w[12] ^ w[0]);
-        w[1] = EXPAND(w[1], w[8], w[14], w[4], w[11]);
-        ROUND16_63(d, e, f, g, h, a, b, c, K29, w[13], w[13] ^ w[1]);
-        w[2] = EXPAND(w[2], w[9], w[15], w[5], w[12]);
-        ROUND16_63(c, d, e, f, g, h, a, b, K30, w[14], w[14] ^ w[2]);
-        w[3] = EXPAND(w[3], w[10], w[0], w[6], w[13]);
-        ROUND16_63(b, c, d, e, f, g, h, a, K31, w[15], w[15] ^ w[3]);
+    uint32_t a = state[0];
+    uint32_t b = state[1];
+    uint32_t c = state[2];
+    uint32_t d = state[3];
+    uint32_t e = state[4];
+    uint32_t f = state[5];
+    uint32_t g = state[6];
+    uint32_t h = state[7];
 
-        w[4] = EXPAND(w[4], w[11], w[1], w[7], w[14]);
-        ROUND16_63(a, b, c, d, e, f, g, h, K32, w[0], w[0] ^ w[4]);
-        w[5] = EXPAND(w[5], w[12], w[2], w[8], w[15]);
-        ROUND16_63(h, a, b, c, d, e, f, g, K33, w[1], w[1] ^ w[5]);
-        w[6] = EXPAND(w[6], w[13], w[3], w[9], w[0]);
-        ROUND16_63(g, h, a, b, c, d, e, f, K34, w[2], w[2] ^ w[6]);
-        w[7] = EXPAND(w[7], w[14], w[4], w[10], w[1]);
-        ROUND16_63(f, g, h, a, b, c, d, e, K35, w[3], w[3] ^ w[7]);
-        w[8] = EXPAND(w[8], w[15], w[5], w[11], w[2]);
-        ROUND16_63(e, f, g, h, a, b, c, d, K36, w[4], w[4] ^ w[8]);
-        w[9] = EXPAND(w[9], w[0], w[6], w[12], w[3]);
-        ROUND16_63(d, e, f, g, h, a, b, c, K37, w[5], w[5] ^ w[9]);
-        w[10] = EXPAND(w[10], w[1], w[7], w[13], w[4]);
-        ROUND16_63(c, d, e, f, g, h, a, b, K38, w[6], w[6] ^ w[10]);
-        w[11] = EXPAND(w[11], w[2], w[8], w[14], w[5]);
-        ROUND16_63(b, c, d, e, f, g, h, a, K39, w[7], w[7] ^ w[11]);
-        w[12] = EXPAND(w[12], w[3], w[9], w[15], w[6]);
-        ROUND16_63(a, b, c, d, e, f, g, h, K40, w[8], w[8] ^ w[12]);
-        w[13] = EXPAND(w[13], w[4], w[10], w[0], w[7]);
-        ROUND16_63(h, a, b, c, d, e, f, g, K41, w[9], w[9] ^ w[13]);
-        w[14] = EXPAND(w[14], w[5], w[11], w[1], w[8]);
-        ROUND16_63(g, h, a, b, c, d, e, f, K42, w[10], w[10] ^ w[14]);
-        w[15] = EXPAND(w[15], w[6], w[12], w[2], w[9]);
-        ROUND16_63(f, g, h, a, b, c, d, e, K43, w[11], w[11] ^ w[15]);
-        w[0] = EXPAND(w[0], w[7], w[13], w[3], w[10]);
-        ROUND16_63(e, f, g, h, a, b, c, d, K44, w[12], w[12] ^ w[0]);
-        w[1] = EXPAND(w[1], w[8], w[14], w[4], w[11]);
-        ROUND16_63(d, e, f, g, h, a, b, c, K45, w[13], w[13] ^ w[1]);
-        w[2] = EXPAND(w[2], w[9], w[15], w[5], w[12]);
-        ROUND16_63(c, d, e, f, g, h, a, b, K46, w[14], w[14] ^ w[2]);
-        w[3] = EXPAND(w[3], w[10], w[0], w[6], w[13]);
-        ROUND16_63(b, c, d, e, f, g, h, a, K47, w[15], w[15] ^ w[3]);
+    // 0 ~ 15 round
+    ROUND00_15(a, b, c, d, e, f, g, h, K0, w[0], w[0] ^ w[4]);
+    ROUND00_15(h, a, b, c, d, e, f, g, K1, w[1], w[1] ^ w[5]);
+    ROUND00_15(g, h, a, b, c, d, e, f, K2, w[2], w[2] ^ w[6]);
+    ROUND00_15(f, g, h, a, b, c, d, e, K3, w[3], w[3] ^ w[7]);
+    ROUND00_15(e, f, g, h, a, b, c, d, K4, w[4], w[4] ^ w[8]);
+    ROUND00_15(d, e, f, g, h, a, b, c, K5, w[5], w[5] ^ w[9]);
+    ROUND00_15(c, d, e, f, g, h, a, b, K6, w[6], w[6] ^ w[10]);
+    ROUND00_15(b, c, d, e, f, g, h, a, K7, w[7], w[7] ^ w[11]);
+    ROUND00_15(a, b, c, d, e, f, g, h, K8, w[8], w[8] ^ w[12]);
+    ROUND00_15(h, a, b, c, d, e, f, g, K9, w[9], w[9] ^ w[13]);
+    ROUND00_15(g, h, a, b, c, d, e, f, K10, w[10], w[10] ^ w[14]);
+    ROUND00_15(f, g, h, a, b, c, d, e, K11, w[11], w[11] ^ w[15]);
+    w[0] = EXPAND(w[0], w[7], w[13], w[3], w[10]);
+    ROUND00_15(e, f, g, h, a, b, c, d, K12, w[12], w[12] ^ w[0]);
+    w[1] = EXPAND(w[1], w[8], w[14], w[4], w[11]);
+    ROUND00_15(d, e, f, g, h, a, b, c, K13, w[13], w[13] ^ w[1]);
+    w[2] = EXPAND(w[2], w[9], w[15], w[5], w[12]);
+    ROUND00_15(c, d, e, f, g, h, a, b, K14, w[14], w[14] ^ w[2]);
+    w[3] = EXPAND(w[3], w[10], w[0], w[6], w[13]);
+    ROUND00_15(b, c, d, e, f, g, h, a, K15, w[15], w[15] ^ w[3]);
 
-        w[4] = EXPAND(w[4], w[11], w[1], w[7], w[14]);
-        ROUND16_63(a, b, c, d, e, f, g, h, K48, w[0], w[0] ^ w[4]);
-        w[5] = EXPAND(w[5], w[12], w[2], w[8], w[15]);
-        ROUND16_63(h, a, b, c, d, e, f, g, K49, w[1], w[1] ^ w[5]);
-        w[6] = EXPAND(w[6], w[13], w[3], w[9], w[0]);
-        ROUND16_63(g, h, a, b, c, d, e, f, K50, w[2], w[2] ^ w[6]);
-        w[7] = EXPAND(w[7], w[14], w[4], w[10], w[1]);
-        ROUND16_63(f, g, h, a, b, c, d, e, K51, w[3], w[3] ^ w[7]);
-        w[8] = EXPAND(w[8], w[15], w[5], w[11], w[2]);
-        ROUND16_63(e, f, g, h, a, b, c, d, K52, w[4], w[4] ^ w[8]);
-        w[9] = EXPAND(w[9], w[0], w[6], w[12], w[3]);
-        ROUND16_63(d, e, f, g, h, a, b, c, K53, w[5], w[5] ^ w[9]);
-        w[10] = EXPAND(w[10], w[1], w[7], w[13], w[4]);
-        ROUND16_63(c, d, e, f, g, h, a, b, K54, w[6], w[6] ^ w[10]);
-        w[11] = EXPAND(w[11], w[2], w[8], w[14], w[5]);
-        ROUND16_63(b, c, d, e, f, g, h, a, K55, w[7], w[7] ^ w[11]);
-        w[12] = EXPAND(w[12], w[3], w[9], w[15], w[6]);
-        ROUND16_63(a, b, c, d, e, f, g, h, K56, w[8], w[8] ^ w[12]);
-        w[13] = EXPAND(w[13], w[4], w[10], w[0], w[7]);
-        ROUND16_63(h, a, b, c, d, e, f, g, K57, w[9], w[9] ^ w[13]);
-        w[14] = EXPAND(w[14], w[5], w[11], w[1], w[8]);
-        ROUND16_63(g, h, a, b, c, d, e, f, K58, w[10], w[10] ^ w[14]);
-        w[15] = EXPAND(w[15], w[6], w[12], w[2], w[9]);
-        ROUND16_63(f, g, h, a, b, c, d, e, K59, w[11], w[11] ^ w[15]);
-        w[0] = EXPAND(w[0], w[7], w[13], w[3], w[10]);
-        ROUND16_63(e, f, g, h, a, b, c, d, K60, w[12], w[12] ^ w[0]);
-        w[1] = EXPAND(w[1], w[8], w[14], w[4], w[11]);
-        ROUND16_63(d, e, f, g, h, a, b, c, K61, w[13], w[13] ^ w[1]);
-        w[2] = EXPAND(w[2], w[9], w[15], w[5], w[12]);
-        ROUND16_63(c, d, e, f, g, h, a, b, K62, w[14], w[14] ^ w[2]);
-        w[3] = EXPAND(w[3], w[10], w[0], w[6], w[13]);
-        ROUND16_63(b, c, d, e, f, g, h, a, K63, w[15], w[15] ^ w[3]);
+    // 16 ~ 63 round
+    w[4] = EXPAND(w[4], w[11], w[1], w[7], w[14]);
+    ROUND16_63(a, b, c, d, e, f, g, h, K16, w[0], w[0] ^ w[4]);
+    w[5] = EXPAND(w[5], w[12], w[2], w[8], w[15]);
+    ROUND16_63(h, a, b, c, d, e, f, g, K17, w[1], w[1] ^ w[5]);
+    w[6] = EXPAND(w[6], w[13], w[3], w[9], w[0]);
+    ROUND16_63(g, h, a, b, c, d, e, f, K18, w[2], w[2] ^ w[6]);
+    w[7] = EXPAND(w[7], w[14], w[4], w[10], w[1]);
+    ROUND16_63(f, g, h, a, b, c, d, e, K19, w[3], w[3] ^ w[7]);
+    w[8] = EXPAND(w[8], w[15], w[5], w[11], w[2]);
+    ROUND16_63(e, f, g, h, a, b, c, d, K20, w[4], w[4] ^ w[8]);
+    w[9] = EXPAND(w[9], w[0], w[6], w[12], w[3]);
+    ROUND16_63(d, e, f, g, h, a, b, c, K21, w[5], w[5] ^ w[9]);
+    w[10] = EXPAND(w[10], w[1], w[7], w[13], w[4]);
+    ROUND16_63(c, d, e, f, g, h, a, b, K22, w[6], w[6] ^ w[10]);
+    w[11] = EXPAND(w[11], w[2], w[8], w[14], w[5]);
+    ROUND16_63(b, c, d, e, f, g, h, a, K23, w[7], w[7] ^ w[11]);
+    w[12] = EXPAND(w[12], w[3], w[9], w[15], w[6]);
+    ROUND16_63(a, b, c, d, e, f, g, h, K24, w[8], w[8] ^ w[12]);
+    w[13] = EXPAND(w[13], w[4], w[10], w[0], w[7]);
+    ROUND16_63(h, a, b, c, d, e, f, g, K25, w[9], w[9] ^ w[13]);
+    w[14] = EXPAND(w[14], w[5], w[11], w[1], w[8]);
+    ROUND16_63(g, h, a, b, c, d, e, f, K26, w[10], w[10] ^ w[14]);
+    w[15] = EXPAND(w[15], w[6], w[12], w[2], w[9]);
+    ROUND16_63(f, g, h, a, b, c, d, e, K27, w[11], w[11] ^ w[15]);
+    w[0] = EXPAND(w[0], w[7], w[13], w[3], w[10]);
+    ROUND16_63(e, f, g, h, a, b, c, d, K28, w[12], w[12] ^ w[0]);
+    w[1] = EXPAND(w[1], w[8], w[14], w[4], w[11]);
+    ROUND16_63(d, e, f, g, h, a, b, c, K29, w[13], w[13] ^ w[1]);
+    w[2] = EXPAND(w[2], w[9], w[15], w[5], w[12]);
+    ROUND16_63(c, d, e, f, g, h, a, b, K30, w[14], w[14] ^ w[2]);
+    w[3] = EXPAND(w[3], w[10], w[0], w[6], w[13]);
+    ROUND16_63(b, c, d, e, f, g, h, a, K31, w[15], w[15] ^ w[3]);
 
-        state[0] ^= a;
-        state[1] ^= b;
-        state[2] ^= c;
-        state[3] ^= d;
-        state[4] ^= e;
-        state[5] ^= f;
-        state[6] ^= g;
-        state[7] ^= h;
+    w[4] = EXPAND(w[4], w[11], w[1], w[7], w[14]);
+    ROUND16_63(a, b, c, d, e, f, g, h, K32, w[0], w[0] ^ w[4]);
+    w[5] = EXPAND(w[5], w[12], w[2], w[8], w[15]);
+    ROUND16_63(h, a, b, c, d, e, f, g, K33, w[1], w[1] ^ w[5]);
+    w[6] = EXPAND(w[6], w[13], w[3], w[9], w[0]);
+    ROUND16_63(g, h, a, b, c, d, e, f, K34, w[2], w[2] ^ w[6]);
+    w[7] = EXPAND(w[7], w[14], w[4], w[10], w[1]);
+    ROUND16_63(f, g, h, a, b, c, d, e, K35, w[3], w[3] ^ w[7]);
+    w[8] = EXPAND(w[8], w[15], w[5], w[11], w[2]);
+    ROUND16_63(e, f, g, h, a, b, c, d, K36, w[4], w[4] ^ w[8]);
+    w[9] = EXPAND(w[9], w[0], w[6], w[12], w[3]);
+    ROUND16_63(d, e, f, g, h, a, b, c, K37, w[5], w[5] ^ w[9]);
+    w[10] = EXPAND(w[10], w[1], w[7], w[13], w[4]);
+    ROUND16_63(c, d, e, f, g, h, a, b, K38, w[6], w[6] ^ w[10]);
+    w[11] = EXPAND(w[11], w[2], w[8], w[14], w[5]);
+    ROUND16_63(b, c, d, e, f, g, h, a, K39, w[7], w[7] ^ w[11]);
+    w[12] = EXPAND(w[12], w[3], w[9], w[15], w[6]);
+    ROUND16_63(a, b, c, d, e, f, g, h, K40, w[8], w[8] ^ w[12]);
+    w[13] = EXPAND(w[13], w[4], w[10], w[0], w[7]);
+    ROUND16_63(h, a, b, c, d, e, f, g, K41, w[9], w[9] ^ w[13]);
+    w[14] = EXPAND(w[14], w[5], w[11], w[1], w[8]);
+    ROUND16_63(g, h, a, b, c, d, e, f, K42, w[10], w[10] ^ w[14]);
+    w[15] = EXPAND(w[15], w[6], w[12], w[2], w[9]);
+    ROUND16_63(f, g, h, a, b, c, d, e, K43, w[11], w[11] ^ w[15]);
+    w[0] = EXPAND(w[0], w[7], w[13], w[3], w[10]);
+    ROUND16_63(e, f, g, h, a, b, c, d, K44, w[12], w[12] ^ w[0]);
+    w[1] = EXPAND(w[1], w[8], w[14], w[4], w[11]);
+    ROUND16_63(d, e, f, g, h, a, b, c, K45, w[13], w[13] ^ w[1]);
+    w[2] = EXPAND(w[2], w[9], w[15], w[5], w[12]);
+    ROUND16_63(c, d, e, f, g, h, a, b, K46, w[14], w[14] ^ w[2]);
+    w[3] = EXPAND(w[3], w[10], w[0], w[6], w[13]);
+    ROUND16_63(b, c, d, e, f, g, h, a, K47, w[15], w[15] ^ w[3]);
 
-        input += CRYPT_SM3_BLOCKSIZE;
-        count--;
-    }
-    //@ assert (\forall integer j; 0 <= j < 16 ==> w[j] == 0);
-    // The 'count == 0 => ignore while()' comment refers to the expected behavior,
-    // which is captured by the ensures clause for blockCnt == 0.
+    w[4] = EXPAND(w[4], w[11], w[1], w[7], w[14]);
+    ROUND16_63(a, b, c, d, e, f, g, h, K48, w[0], w[0] ^ w[4]);
+    w[5] = EXPAND(w[5], w[12], w[2], w[8], w[15]);
+    ROUND16_63(h, a, b, c, d, e, f, g, K49, w[1], w[1] ^ w[5]);
+    w[6] = EXPAND(w[6], w[13], w[3], w[9], w[0]);
+    ROUND16_63(g, h, a, b, c, d, e, f, K50, w[2], w[2] ^ w[6]);
+    w[7] = EXPAND(w[7], w[14], w[4], w[10], w[1]);
+    ROUND16_63(f, g, h, a, b, c, d, e, K51, w[3], w[3] ^ w[7]);
+    w[8] = EXPAND(w[8], w[15], w[5], w[11], w[2]);
+    ROUND16_63(e, f, g, h, a, b, c, d, K52, w[4], w[4] ^ w[8]);
+    w[9] = EXPAND(w[9], w[0], w[6], w[12], w[3]);
+    ROUND16_63(d, e, f, g, h, a, b, c, K53, w[5], w[5] ^ w[9]);
+    w[10] = EXPAND(w[10], w[1], w[7], w[13], w[4]);
+    ROUND16_63(c, d, e, f, g, h, a, b, K54, w[6], w[6] ^ w[10]);
+    w[11] = EXPAND(w[11], w[2], w[8], w[14], w[5]);
+    ROUND16_63(b, c, d, e, f, g, h, a, K55, w[7], w[7] ^ w[11]);
+    w[12] = EXPAND(w[12], w[3], w[9], w[15], w[6]);
+    ROUND16_63(a, b, c, d, e, f, g, h, K56, w[8], w[8] ^ w[12]);
+    w[13] = EXPAND(w[13], w[4], w[10], w[0], w[7]);
+    ROUND16_63(h, a, b, c, d, e, f, g, K57, w[9], w[9] ^ w[13]);
+    w[14] = EXPAND(w[14], w[5], w[11], w[1], w[8]);
+    ROUND16_63(g, h, a, b, c, d, e, f, K58, w[10], w[10] ^ w[14]);
+    w[15] = EXPAND(w[15], w[6], w[12], w[2], w[9]);
+    ROUND16_63(f, g, h, a, b, c, d, e, K59, w[11], w[11] ^ w[15]);
+    w[0] = EXPAND(w[0], w[7], w[13], w[3], w[10]);
+    ROUND16_63(e, f, g, h, a, b, c, d, K60, w[12], w[12] ^ w[0]);
+    w[1] = EXPAND(w[1], w[8], w[14], w[4], w[11]);
+    ROUND16_63(d, e, f, g, h, a, b, c, K61, w[13], w[13] ^ w[1]);
+    w[2] = EXPAND(w[2], w[9], w[15], w[5], w[12]);
+    ROUND16_63(c, d, e, f, g, h, a, b, K62, w[14], w[14] ^ w[2]);
+    w[3] = EXPAND(w[3], w[10], w[0], w[6], w[13]);
+    ROUND16_63(b, c, d, e, f, g, h, a, K63, w[15], w[15] ^ w[3]);
+
+    state[0] ^= a;
+    state[1] ^= b;
+    state[2] ^= c;
+    state[3] ^= d;
+    state[4] ^= e;
+    state[5] ^= f;
+    state[6] ^= g;
+    state[7] ^= h;
+
+    input += CRYPT_SM3_BLOCKSIZE;
+    count--;
+  }
+
 }
 #endif // HITLS_CRYPTO_SM3
