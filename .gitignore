@@ -29,3 +29,8 @@ Thumbs.db
 
 # 日志文件
 *.log
+
+# 脚本
+claude_code_prod.sh
+.idea/
+cmake-build-debug-gcc-13/
