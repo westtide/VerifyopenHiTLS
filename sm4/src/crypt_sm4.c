@@ -1,4 +1,4 @@
-/*
+/*  ivette -wp -rte -cpp-extra-args="-DHITLS_CRYPTO_SM4 -I ./include/bsl -I ./include/crypto -I ./bsl/err/include -I ./crypto/include -I ./config/macro_config -I ./config -I ./include -I ./sm4/include -I ./platform/Secure_C/include"  -wp-timeout 60 -wp-prover z3 sm4/src/crypt_sm4.c
  * This file is part of the openHiTLS project.
  *
  * openHiTLS is licensed under the Mulan PSL v2.
@@ -224,6 +224,7 @@ static const uint32_t XBOX_3[] = {
  *             = (XBOX_0[a] <<< 24)⊕(XBOX_0[b] <<< 16)⊕(XBOX_0[c] <<< 8)⊕XBOX_0[d]
  *             = XBOX_3[a]⊕XBOX_2[b]⊕XBOX_1[c]⊕XBOX_0[d]
  * F(Xi,Xi+1,Xi+2,Xi+3,rki) = Xi⊕TE(Xi+1⊕Xi+2⊕Xi+3⊕rki)
+ * 基于 T-Box 优化 的 SM4 轮函数实现。其核心思想是将 SM4 轮函数中的两个主要步骤——非线性 S-Box 代换和线性变换 L——合并成一个单一的操作，即查表
  */
 #define CRYPT_SM4_ROUND(t, x0, x1, x2, x3, rk, sbox)   \
     do {                                     \
@@ -410,13 +411,15 @@ int32_t CRYPT_SM4_Decrypt(CRYPT_SM4_Ctx *ctx, const uint8_t *in, uint8_t *out, u
 {
     return CRYPT_SM4_Crypt(ctx, in, out, length, false);
 }
-
 /*@
-  // 内存安全性要求：ctx 要么为空，要么指向有效的 CRYPT_SM4_Ctx 对象
-  requires ctx == \null || \valid(ctx);
-  
-  // 函数可能修改 ctx 指向的内容
+ predicate is_zeroed(unsigned char* p, integer len) = 
+  \forall integer i; 0 <= i < len ==> p[i] == 0;
+*/
+/*@
+  // 内存安全性：ctx 要么为空，要么指向有效的 CRYPT_SM4_Ctx 对象
+  requires (ctx == \null) || \valid(ctx);
   assigns *ctx;
+  ensures (\old(ctx) != \null) ==> is_zeroed((unsigned char*)\old(ctx), sizeof(CRYPT_SM4_Ctx));
 */
 void CRYPT_SM4_Clean(CRYPT_SM4_Ctx *ctx)
 {
