@@ -2,6 +2,8 @@
 ivette -wp -rte \
   -cpp-extra-args="-DHITLS_CRYPTO_SM3 -I ./include/bsl -I ./include/crypto -I ./bsl/err/include  -I ./crypto/include  -I ./config/macro_config -I ./config -I ./include -I ./sm3/include" \
   sm3/src/noasm_sm3_count1.c
+  此版本将轮计算当做axiomatic定义，实现了内存安全、运行时的验证，仍缺少基于协议的功能一致性验证。即需要验证轮计算等价于数学计算。TBD
+  此外，需要关注循环体中不可达的几条spec。整体验证需要15分钟时间。
 
  * This file is part of the openHiTLS project.
  *
