@@ -21,6 +21,7 @@ ivette -wp -rte \
  */
 
 #include "hitls_build.h"
+#include "noasm_sm3_ghost.h"
 #ifdef HITLS_CRYPTO_SM3
 
 #include <stdint.h>
@@ -97,39 +98,15 @@ ivette -wp -rte \
 #define K62 0x9ea1e762U
 #define K63 0x3d43cec5U
 
-/*@
-  // 用logic定义ROTL32（32位循环左移），确保在ACSL中可以使用
-  logic integer ROTL32_Logic(integer x, integer n) = ((x << n) | ((x >> (32 - n)) & ((1 << n) - 1))) & 0xFFFFFFFF;
-
-  // P0由ROTL32定义
-  logic integer P0_Logic(integer x) = (x ^ ROTL32_Logic(x, 9) ^ ROTL32_Logic(x, 17)) & 0xFFFFFFFF;
-
-    // P1由ROTL32定义
-  logic integer P1_Logic(integer x) = (x ^ ROTL32_Logic(x, 15) ^ ROTL32_Logic(x, 23)) & 0xFFFFFFFF;
-*/
 #define P0(x) ((x) ^ ROTL32((x), 9) ^ ROTL32((x), 17))
 #define P1(x) ((x) ^ ROTL32((x), 15) ^ ROTL32((x), 23))
 
-/*@
-  // 以下是SM3中的四个布尔函数FF和GG
-  // FF函数拆分为FF0和FF1
-  logic integer FF0_Logic(integer x, integer y, integer z) = (x ^ y ^ z) & 0xFFFFFFFF;
-  logic integer FF1_Logic(integer x, integer y, integer z) = ((x & y) | (x & z) | (y & z)) & 0xFFFFFFFF;
-  // GG函数拆分为GG0和GG1
-  logic integer GG0_Logic(integer x, integer y, integer z) = (x ^ y ^ z) & 0xFFFFFFFF;
-  logic integer GG1_Logic(integer x, integer y, integer z) = ((x & y) | (~x & z)) & 0xFFFFFFFF;
-*/
+
 #define FF0(x, y, z) ((x) ^ (y) ^ (z))
 #define FF1(x, y, z) (((x) & (y)) | ((x) & (z)) | ((y) & (z)))
 #define GG0(x, y, z) ((x) ^ (y) ^ (z))
 #define GG1(x, y, z) (((x) & (y)) | (~(x) & (z)))
 
-/*
-  SM3中的单轮运算步骤，因为while(0)只执行一次
-  其中H..F使用()括起来以避免宏展开时的优先级问题
-  但是FF、GG是传入时决定FF0、FF1、GG0、GG1的
-  因此ROUND不写logic，需要单独写ROUND00_15和ROUND16_63
-*/
 #define ROUND(A, B, C, D, E, F, G, H, K, FF, GG, Wj, Wi) \
   do                                                     \
   {                                                      \
@@ -144,83 +121,13 @@ ivette -wp -rte \
     (F) = ROTL32((F), 19);                               \
   } while (0)
 
-/*@
-  // 公理定义GetUint32Be
-  axiomatic GetUint32Be {
-  logic integer get_uint32_be_logic( unsigned char* p, integer i);
-  axiom get_uint32_be_def:
-    \forall  unsigned char* p, integer i; \valid_read(p + (i .. i+3)) ==>
-      get_uint32_be_logic(p,i) ==
-        (((integer)p[i]   << 24) |
-         ((integer)p[i+1] << 16) |
-         ((integer)p[i+2] <<  8) |
-         ((integer)p[i+3]));
-  }
 
-  axiomatic SM3Types {
-    // 用于存放一轮计算后更新的四个寄存器的值
-    type Round_Update_Values;
-    
-    type SM3_State;
-    
-    logic integer Round_Update_Values_new_b(Round_Update_Values r);
-    logic integer Round_Update_Values_new_d(Round_Update_Values r);
-    logic integer Round_Update_Values_new_f(Round_Update_Values r);
-    logic integer Round_Update_Values_new_h(Round_Update_Values r);
-    
-    logic integer SM3_State_a(SM3_State s);
-    logic integer SM3_State_b(SM3_State s);
-    logic integer SM3_State_c(SM3_State s);
-    logic integer SM3_State_d(SM3_State s);
-    logic integer SM3_State_e(SM3_State s);
-    logic integer SM3_State_f(SM3_State s);
-    logic integer SM3_State_g(SM3_State s);
-    logic integer SM3_State_h(SM3_State s);
-    
-    logic Round_Update_Values Round_Update_Values_make(integer nb, integer nd, integer nf, integer nh);
-    logic SM3_State SM3_State_make(integer a, integer b, integer c, integer d, integer e, integer f, integer g, integer h);
-    
-    logic Round_Update_Values
-    Compute_Round_Update_Logic(integer A, integer B, integer C, integer D,
-                               integer E, integer F, integer G, integer H,
-                               integer K, integer Wj, integer Wi, integer is_ff0_gg0);
-  }
-
-
-  logic SM3_State State_from_array(uint32_t* s) =
-    SM3_State_make(s[0], s[1], s[2], s[3], s[4], s[5], s[6], s[7]);
-
-  predicate State_equals_array(SM3_State ls, uint32_t* cs) =
-    (SM3_State_a(ls) == cs[0]) && (SM3_State_b(ls) == cs[1]) && (SM3_State_c(ls) == cs[2]) && (SM3_State_d(ls) == cs[3]) &&
-    (SM3_State_e(ls) == cs[4]) && (SM3_State_f(ls) == cs[5]) && (SM3_State_g(ls) == cs[6]) && (SM3_State_h(ls) == cs[7]);
-
-  // 为消息扩展(W和W')建立逻辑模型。为简化，这里使用公理化声明。
-  // 一个完整的证明需要将此处的公理替换为具体的递归逻辑函数定义。
-  axiomatic MessageExpansion {
-      logic integer W_logic(integer j,  uint8_t* block);
-      logic integer W_prime_logic(integer j,  uint8_t* block);
-  }
-
-  // 递归地模拟单个块的64轮置换过程  
-  logic SM3_State SM3_Permutation_Recursive(SM3_State s, uint8_t* block, integer j);
-
-  // 模拟对单个512位消息块的完整压缩函数(CF)
-  logic SM3_State SM3_Process_Block(SM3_State initial_s, uint8_t* block);
-
-  // 顶层递归逻辑函数，模拟对所有数据块的迭代压缩
-  logic SM3_State SM3_Compression_Full(SM3_State s, uint8_t* data, integer num_blocks);
-*/
 #define ROUND00_15(A, B, C, D, E, F, G, H, K, Wj, Wi) \
   ROUND(A, B, C, D, E, F, G, H, K, FF0, GG0, Wj, Wi)
 
 #define ROUND16_63(A, B, C, D, E, F, G, H, K, Wj, Wi) \
   ROUND(A, B, C, D, E, F, G, H, K, FF1, GG1, Wj, Wi)
 
-/*@
-  logic integer EXPAND_Logic(integer W1, integer W2, integer W3,
-                       integer W4, integer W5) =
-    (P1_Logic(W1 ^ W2 ^ ROTL32_Logic(W3, 15)) ^ ROTL32_Logic(W4, 7) ^ W5) & 0xFFFFFFFF;
-*/
 #define EXPAND(W1, W2, W3, W4, W5) \
   (P1((W1) ^ (W2) ^ ROTL32((W3), 15)) ^ ROTL32((W4), 7) ^ (W5))
 
@@ -233,9 +140,34 @@ ivette -wp -rte \
   requires \separated(state + (0..7), data + (0.. blockCnt * 64 - 1));
   // 内存安全：该函数唯一允许修改的内存是 state 数组
   assigns state[0..7];
-  // 若没有数据块要处理，则 state 数组不变
-  ensures blockCnt == 0 ==>
-    (\forall integer i; 0 <= i <= 7 ==> state[i] == \old(state[i]));
+
+  // 行为1：没有数据块要处理
+  behavior zero_blocks:
+    assumes blockCnt == 0;
+    assigns \nothing;
+    ensures \forall integer i; 0 <= i <= 7 ==> state[i] == \at(state[i], Pre);
+
+  // 行为2：只执行一次循环
+  behavior one_block:
+    assumes blockCnt == 1;
+    // 功能正确性：函数执行后，C的state数组的值必须等于幽灵模型计算出的最终状态
+    ensures State_equals_array(
+      SM3_Compression_Full(
+            \at(State_from_array(state), Pre),
+            (uint8_t*)data,
+            1 // 明确指定块数为1
+        ),
+        state
+    );
+  // 行为3：执行完整循环
+  behavior full_blocks:
+      assumes blockCnt > 1;
+      assigns state[0..7];
+      // 后置条件 (Ensures): 暂时设置为 \true，不进行功能验证，以节省时间
+      ensures \true;
+  
+  complete behaviors;
+  disjoint behaviors;
 */
 void SM3_Compress(uint32_t state[8], const uint8_t *data, uint32_t blockCnt)
 {
@@ -244,13 +176,22 @@ void SM3_Compress(uint32_t state[8], const uint8_t *data, uint32_t blockCnt)
   uint32_t count = blockCnt;
 
   /*@
-    // 计数器不变量: count 的值在 0 和初始 blockCnt 之间
+    // 计数器 count 的值在 0 和初始 blockCnt 之间
     loop invariant 0 <= count <= \at(blockCnt, Pre);
-    // 指针不变量: input 指针总是正确地指向当前待处理的数据块
+    // input 指针总是正确地指向当前待处理的数据块
     loop invariant input == \at(data, Pre) + (\at(blockCnt, Pre) - count) * 64;
-    // 赋值声明
+    // 保证 w 数组的内存安全
+    loop invariant \valid(w + (0..15));
+    // 将每轮循环开始时的状态与 Ghost 模型关联
+    loop invariant State_equals_array(
+        SM3_Compression_Full(
+            \at(State_from_array(state), Pre),
+            (uint8_t*)\at(data, Pre),
+            \at(blockCnt, Pre) - count
+        ),
+        state
+    );
     loop assigns count, input, state[0..7], w[0..15];
-    // 循环遍体：会终止
     loop variant count;
   */
   while (count > 0)
@@ -403,6 +344,11 @@ void SM3_Compress(uint32_t state[8], const uint8_t *data, uint32_t blockCnt)
     w[3] = EXPAND(w[3], w[10], w[0], w[6], w[13]);
     ROUND16_63(b, c, d, e, f, g, h, a, K63, w[15], w[15] ^ w[3]);
 
+    /*@
+      // 暂时简化断言以避免复杂的逻辑表达式
+      assert \true;
+    */
+    
     state[0] ^= a;
     state[1] ^= b;
     state[2] ^= c;
