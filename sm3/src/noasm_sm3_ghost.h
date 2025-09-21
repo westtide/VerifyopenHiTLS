@@ -5,7 +5,7 @@
   axiomatic SM3Types {
     // 抽象的逻辑类型 SM3_State，用于表示8个32位寄存器
     type SM3_State;
-    
+
     // 声明类型的访问函数:用于从 SM3_State 对象中获取每个寄存器的值
     logic integer SM3_State_a(SM3_State s);
     logic integer SM3_State_b(SM3_State s);
@@ -98,8 +98,8 @@
     logic integer W_logic(integer j, uint8_t* block) =
         0 <= j <= 15 ? get_uint32_be_logic(block, j * 4) :
         16 <= j <= 67 ?
-            (P1_Logic(W_logic(j - 16, block) ^ 
-            W_logic(j - 9, block) ^ 
+            (P1_Logic(W_logic(j - 16, block) ^
+            W_logic(j - 9, block) ^
             ROTL32_Logic(W_logic(j - 3, block), 15)) ^
             ROTL32_Logic(W_logic(j - 13, block), 7) ^
             W_logic(j - 6, block)) & 0xFFFFFFFF
@@ -107,7 +107,7 @@
     // 递归定义消息扩展 Wj’
     logic integer W_prime_logic(integer j, uint8_t* block) =
         W_logic(j, block) ^ W_logic(j + 4, block);
-    
+
     // 逻辑函数实现单轮压缩
     logic SM3_State SM3_Single_Round_Logic(SM3_State s, integer j, uint8_t* block) =
         \let a = SM3_State_a(s);
@@ -155,11 +155,81 @@
         (SM3_State_g(initial_s) ^ SM3_State_g(final_perm_state)) & 0xFFFFFFFF,
         (SM3_State_h(initial_s) ^ SM3_State_h(final_perm_state)) & 0xFFFFFFFF
         );
-    
+
     // 多块数据的完整压缩函数CF
-    logic SM3_State SM3_Compression_Full(SM3_State s, uint8_t* data, integer num_blocks) =
-    num_blocks == 0 ? s :
-    SM3_Compression_Full(SM3_Process_Block(s, data), data + 64, num_blocks - 1);
+    logic SM3_State SM3_Compression_Full(SM3_State s, uint8_t* data, integer num_blocks) = num_blocks == 0 ? s : SM3_Compression_Full(SM3_Process_Block(s, data), data + 64, num_blocks - 1);
+
+
+    //
+   logic SM3_State SM3_Single_Round_From_C_Logic(
+        integer A, integer B, integer C, integer D,
+        integer E, integer F, integer G, integer H,
+        integer j, uint8_t* block) =
+        \let a12    = ROTL32_Logic(A, 12);
+        \let ss1    = ROTL32_Logic((a12 + E + K_logic(j)) & 0xFFFFFFFF, 7);
+        \let ss2    = ss1 ^ a12;
+        \let ff_val = (j < 16 ? FF0_Logic(A, B, C) : FF1_Logic(A, B, C));
+        \let gg_val = (j < 16 ? GG0_Logic(E, F, G) : GG1_Logic(E, F, G));
+        \let tt1    = (ff_val + D + ss2 + W_prime_logic(j, block)) & 0xFFFFFFFF;
+        \let tt2    = (gg_val + H + ss1 + W_logic(j, block)) & 0xFFFFFFFF;
+        \let next_A = A;
+        \let next_B = ROTL32_Logic(B, 9);
+        \let next_C = C;
+        \let next_D = P0_Logic(tt2);
+        \let next_E = E;
+        \let next_F = ROTL32_Logic(F, 19);
+        \let next_G = G;
+        \let next_H = tt1;
+        SM3_State_make(next_H, next_A, next_B, next_C, next_D, next_E, next_F, next_G);
+
+    // 引理1: 证明上述对C代码的模拟，其效果等同于抽象的单轮函数
+   lemma Lemma_Single_Round_Equivalence:
+        \forall SM3_State s, integer j, uint8_t* block;
+        \valid_read(block + (0..63)) && 0 <= j < 64 ==>
+        SM3_Single_Round_From_C_Logic(
+            SM3_State_a(s), SM3_State_b(s), SM3_State_c(s), SM3_State_d(s),
+            SM3_State_e(s), SM3_State_f(s), SM3_State_g(s), SM3_State_h(s),
+            j, block
+        ) == SM3_Single_Round_Logic(s, j, block);
+    // 辅助函数：使用与引理1相同的逻辑，递归地模拟C代码的64轮置换
+    logic SM3_State SM3_Permutation_From_C_Recursive(SM3_State s, uint8_t* block, integer j) =
+        j == 64 ? s :
+        SM3_Permutation_From_C_Recursive(
+            SM3_Single_Round_From_C_Logic(
+                SM3_State_a(s), SM3_State_b(s), SM3_State_c(s), SM3_State_d(s),
+                SM3_State_e(s), SM3_State_f(s), SM3_State_g(s), SM3_State_h(s),
+                j, block
+            ),
+            block,
+            j + 1
+        );
+
+
+    // 引理 2：证明64轮的C代码置换操作 与 抽象的递归置换等价
+      lemma Lemma_Permutation_Equivalence:
+        \forall SM3_State s, uint8_t* block;
+        \valid_read(block + (0..63)) ==>
+        SM3_Permutation_From_C_Recursive(s, block, 0) == SM3_Permutation_Recursive(s, block, 0);
+
+    // 辅助函数：模拟C代码的完整循环体（64轮置换 + 最终异或）
+    logic SM3_State SM3_Process_Block_From_C_Logic(SM3_State initial_s, uint8_t* block) =
+        \let final_perm_state = SM3_Permutation_From_C_Recursive(initial_s, block, 0);
+        SM3_State_make(
+            (SM3_State_a(initial_s) ^ SM3_State_a(final_perm_state)) & 0xFFFFFFFF,
+            (SM3_State_b(initial_s) ^ SM3_State_b(final_perm_state)) & 0xFFFFFFFF,
+            (SM3_State_c(initial_s) ^ SM3_State_c(final_perm_state)) & 0xFFFFFFFF,
+            (SM3_State_d(initial_s) ^ SM3_State_d(final_perm_state)) & 0xFFFFFFFF,
+            (SM3_State_e(initial_s) ^ SM3_State_e(final_perm_state)) & 0xFFFFFFFF,
+            (SM3_State_f(initial_s) ^ SM3_State_f(final_perm_state)) & 0xFFFFFFFF,
+            (SM3_State_g(initial_s) ^ SM3_State_g(final_perm_state)) & 0xFFFFFFFF,
+            (SM3_State_h(initial_s) ^ SM3_State_h(final_perm_state)) & 0xFFFFFFFF
+        );
+
+    // 引理3: 证明完整的C循环体操作(64轮+异或) 与 抽象的单块处理等价
+     lemma Lemma_Process_Block_Equivalence:
+        \forall SM3_State s, uint8_t* block;
+        \valid_read(block + (0..63)) ==>
+        SM3_Process_Block_From_C_Logic(s, block) == SM3_Process_Block(s, block);
 
 
 */

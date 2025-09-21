@@ -20,67 +20,51 @@
 #include "crypt_types.h"
 #include "bsl_params.h"
 #include "crypt_params_key.h"
+#include "crypt_eal_provider.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif // __cplusplus
 
+#define CRYPT_PKEY_FLAG_DUP             0x01
+#define CRYPT_PKEY_FLAG_NEED_EXPORT_CB  0x02
+
 /* length function */
 typedef int32_t (*GetLenFunc)(const void *ctx);
 
 /* Prototype of the MD algorithm operation functions */
-typedef void* (*MdNewCtx)(void);
-typedef void* (*MdProvNewCtx)(void *provCtx, int32_t algId);
+typedef void* (*MdNewCtx)(void *provCtx, int32_t algId);
 typedef int32_t (*MdInit)(void *data, const BSL_Param *param);
 typedef int32_t (*MdUpdate)(void *data, const uint8_t *input, uint32_t len);
 typedef int32_t (*MdFinal)(void *data, uint8_t *out, uint32_t *len);
-typedef void (*MdDeinit)(void *data);
-typedef int32_t (*MdCopyCtx)(void *dst, void *src);
+typedef int32_t (*MdDeinit)(void *data);
+typedef int32_t (*MdCopyCtx)(void *dst, const void *src);
 typedef void* (*MdDupCtx)(const void *src);
 typedef void (*MdFreeCtx)(void *data);
-typedef int32_t (*MdCtrl)(void *data, int32_t cmd, void *val, uint32_t valLen);
+typedef int32_t (*MdGetParam)(void *data, BSL_Param *param);
 typedef int32_t (*MdSqueeze)(void *data, uint8_t *out, uint32_t len);
 
 typedef struct {
-    uint16_t blockSize; // Block size processed by the hash algorithm at a time, which is used with other algorithms.
-    uint16_t mdSize;    // Output length of the HASH algorithm
-    MdNewCtx newCtx;    // generate md context
-    MdInit init;        // Initialize the MD context.
-    MdUpdate update;    // Add block data for MD calculation.
-    MdFinal final;      // Complete the MD calculation and obtain the MD result.
-    MdDeinit deinit;    // Clear the key information of the MD context.
-    MdCopyCtx copyCtx; // Copy the MD context.
-    MdDupCtx dupCtx;  // Dup the MD context.
+    uint32_t id;
+    uint16_t blockSize;  // Block size processed by the hash algorithm at a time, which is used with other algorithms.
+    uint16_t mdSize;     // Output length of the HASH algorithm
+    MdNewCtx newCtx;     // generate md context
+    MdInit init;         // Initialize the MD context.
+    MdUpdate update;     // Add block data for MD calculation.
+    MdFinal final;       // Complete the MD calculation and obtain the MD result.
+    MdDeinit deinit;     // Clear the key information of the MD context.
+    MdCopyCtx copyCtx;   // Copy the MD context.
+    MdDupCtx dupCtx;     // Dup the MD context.
     MdFreeCtx freeCtx;   // free md context
-    MdCtrl ctrl;        // get/set md param
-    MdSqueeze squeeze;  // squeeze the MD context.
+    MdGetParam getParam; // get/set md param
+    MdSqueeze squeeze;   // squeeze the MD context.
 } EAL_MdMethod;
-
-typedef struct {
-    uint16_t blockSize;
-    uint16_t mdSize;
-    MdNewCtx newCtx;
-    MdProvNewCtx provNewCtx;
-    MdInit init;
-    MdUpdate update;
-    MdFinal final;
-    MdDeinit deinit;
-    MdDupCtx dupCtx;
-    MdFreeCtx freeCtx;
-    MdCtrl ctrl;
-    MdSqueeze squeeze;  // squeeze the MD context.
-} EAL_MdUnitaryMethod;
 
 typedef struct {
     uint16_t hashSize;              // Output length of the Siphash algorithm
     uint16_t compressionRounds;     // the number of compression rounds
     uint16_t finalizationRounds;    // the number of finalization rounds
 } EAL_SiphashMethod;
-
-typedef struct {
-    uint32_t id;
-    EAL_MdMethod *mdMeth;
-} EAL_CidToMdMeth;
 
 /* provide asymmetric primitive method */
 typedef void *(*PkeyNew)(void);
@@ -113,7 +97,8 @@ typedef int32_t (*PkeyRecover)(const void *key, const uint8_t *sign, uint32_t si
     uint8_t *data, uint32_t *dataLen);
 typedef int32_t (*PkeyComputeShareKey)(const void *key, const void *pub, uint8_t *share, uint32_t *shareLen);
 typedef int32_t (*PkeyCrypt)(const void *key, const uint8_t *data, uint32_t dataLen, uint8_t *out, uint32_t *outLen);
-typedef int32_t (*PkeyCheck)(const void *prv, const void *pub);
+typedef int32_t (*PkeyHEOperation)(const void *ctx, const BSL_Param *input, uint8_t *out, uint32_t *outLen);
+typedef int32_t (*PkeyCheck)(uint32_t checkType, const void *key1, const void *key2);
 typedef int32_t (*PkeyCmp)(const void *key1, const void *key2);
 typedef int32_t (*PkeyCopyParam)(const void *src, void *dest);
 typedef int32_t (*PkeyGetSecBits)(const void *key);
@@ -128,6 +113,10 @@ typedef int32_t (*PkeyBlind)(void *pkey, int32_t mdAlgId, const uint8_t *input, 
     uint8_t *out, uint32_t *outLen);
 typedef int32_t (*PkeyUnBlind)(const void *pkey, const uint8_t *input, uint32_t inputLen,
     uint8_t *out, uint32_t *outLen);
+
+typedef int32_t (*PkeyImport)(void *key, const BSL_Param *params);
+
+typedef int32_t (*PkeyExport)(const void *key, BSL_Param *params);
 
 /**
 * @ingroup  EAL
@@ -156,6 +145,8 @@ typedef struct EAL_PkeyMethod {
     PkeyComputeShareKey computeShareKey;    // Calculate the shared key.
     PkeyCrypt encrypt;                      // Encrypt.
     PkeyCrypt decrypt;                      // Decrypt.
+    PkeyHEOperation headd;                  // Add
+    PkeyHEOperation hemul;                  // Multiply
     PkeyCheck check;                        // Check the consistency of the key pair.
     PkeyCmp cmp;                            // Compare keys and parameters.
     PkeyCopyParam copyPara;                 // Copy parameter from source to destination
@@ -186,6 +177,8 @@ typedef struct EAL_PkeyUnitaryMethod {
     PkeyComputeShareKey computeShareKey;    // Calculate the shared key.
     PkeyCrypt encrypt;                      // Encrypt.
     PkeyCrypt decrypt;                      // Decrypt.
+    PkeyHEOperation headd;                  // Add
+    PkeyHEOperation hemul;                  // Multiply
     PkeyCheck check;                        // Check the consistency of the key pair.
     PkeyCmp cmp;                            // Compare keys and parameters.
     PkeyEncapsulateInit encapsInit;        // Key encapsulation init.
@@ -194,6 +187,8 @@ typedef struct EAL_PkeyUnitaryMethod {
     PkeyDecapsulate decaps;                // Key decapsulation.
     PkeyBlind blind;                        // msg blind
     PkeyUnBlind unBlind;                    // sig unBlind.
+    PkeyImport import;                      // import key
+    PkeyExport export;                      // export key
 } EAL_PkeyUnitaryMethod;
 /**
  * @ingroup  sym_algid
@@ -261,16 +256,16 @@ typedef struct {
 } EAL_CipherUnitaryMethod;
 
 /* prototype of MAC algorithm operation functions */
-typedef void* (*MacNewCtx)(CRYPT_MAC_AlgId id);
-typedef void* (*MacProvNewCtx)(void *provCtx, int32_t algId);
+typedef void* (*MacNewCtx)(void *provCtx, int32_t algId);
 // Complete key initialization.
 typedef int32_t (*MacInit)(void *ctx, const uint8_t *key, uint32_t len, const BSL_Param *param);
 typedef int32_t (*MacUpdate)(void *ctx, const uint8_t *in, uint32_t len);
 typedef int32_t (*MacFinal)(void *ctx, const uint8_t *out, uint32_t *len);
-typedef void    (*MacDeinit)(void *ctx);
+typedef int32_t (*MacDeinit)(void *ctx);
 // The action is opposite to the initCtx. Sensitive data is deleted.
-typedef void    (*MacReinit)(void *ctx);
+typedef int32_t (*MacReinit)(void *ctx);
 typedef int32_t (*MacCtrl)(void *data, int32_t cmd, void *val, uint32_t valLen);
+typedef int32_t (*MacSetParam)(void *data, const BSL_Param *param);
 typedef void (*MacFreeCtx)(void *ctx);
 
 /* set of MAC algorithm operation methods */
@@ -283,31 +278,21 @@ typedef struct {
     // Re-initialize the key. This method is used where the keys are the same during multiple MAC calculations.
     MacReinit reinit;
     MacCtrl ctrl;
-    MdFreeCtx freeCtx;
+    MacSetParam setParam;
+    MacFreeCtx freeCtx;
 } EAL_MacMethod;
 
 typedef struct {
-    MacNewCtx newCtx;
-    MdFreeCtx freeCtx;
-    MacProvNewCtx provNewCtx;
-    MacInit init;           // Initialize the MAC context.
-    MacUpdate update;       // Add block data for MAC calculation.
-    MacFinal final;         // Complete MAC calculation and obtain the MAC result.
-    MacDeinit deinit;       // Clear the key information in MAC context.
-    // Re-initialize the key. This method is used where the keys are the same during multiple MAC calculations.
-    MacReinit reinit;
-    MacCtrl ctrl;
-} EAL_MacUnitaryMethod;
-
-typedef struct {
-    const EAL_MacMethod *macMethod;
     union {
-        const EAL_MdMethod *md;        // MD algorithm which HMAC depends on
-        const EAL_SymMethod *ciph;  // AES function wihch CMAC depends on
-        const EAL_SiphashMethod *sip;  // siphash method
-        const void *depMeth;           // Pointer to the dependent algorithm, which is reserved for extension.
-    };
-} EAL_MacMethLookup;
+        CRYPT_MD_AlgId mdId;
+        CRYPT_SYM_AlgId symId;
+    } id;
+    union {
+        EAL_MdMethod *md;        // MD algorithm which HMAC depends on
+        const EAL_SymMethod *sym;  // AES function wihch CMAC depends on
+        EAL_SiphashMethod *sip;  // siphash method
+    } method;
+} EAL_MacDepMethod;
 
 /**
  * @ingroup  mode_algid
@@ -333,10 +318,12 @@ typedef enum {
  */
 typedef struct {
     int32_t saltLen;               /**< pss salt length. -1 indicates hashLen, -2 indicates MaxLen, -3 is AutoLen */
-    const EAL_MdMethod *mdMeth;    /**< pss mdid method when padding */
-    const EAL_MdMethod *mgfMeth;   /**< pss mgfid method when padding */
+    EAL_MdMethod mdMeth;           /**< pss mdid method when padding */
+    EAL_MdMethod mgfMeth;          /**< pss mgfid method when padding */
     CRYPT_MD_AlgId mdId;           /**< pss mdid when padding */
     CRYPT_MD_AlgId mgfId;          /**< pss mgfid when padding */
+    void *mdProvCtx;
+    void *mgfProvCtx;
 } RSA_PadingPara;
 
 /* Prototype of the KDF algorithm operation functions */
@@ -354,7 +341,6 @@ typedef struct {
     KdfDerive derive;
     KdfDeinit deinit;
     KdfFreeCtx freeCtx;
-    KdfCtrl ctrl;
 } EAL_KdfMethod;
 
 typedef struct {
@@ -373,8 +359,7 @@ typedef struct {
 } EAL_CidToKdfMeth;
 
 /* Prototype of the RAND algorithm operation functions */
-typedef void *(*RandNewCtx)(int32_t algId, BSL_Param *param);
-typedef void *(*RandDrbgNewCtx)(void *provCtx, int32_t algId, BSL_Param *param);
+typedef void *(*RandDrbgNewCtx)(void *libCtx, int32_t algId, BSL_Param *param);
 typedef int32_t (*RandDrbgInst)(void *ctx, const uint8_t *pers, uint32_t persLen, BSL_Param *param);
 typedef int32_t (*RandDrbgUnInst)(void *ctx);
 typedef int32_t (*RandDrbgGen)(void *ctx, uint8_t *bytes, uint32_t len,
@@ -384,8 +369,7 @@ typedef int32_t (*RandDrbgCtrl)(void *ctx, int32_t cmd, void *val, uint32_t valL
 typedef void (*RandDrbgFreeCtx)(void *ctx);
 
 typedef struct {
-    RandNewCtx newCtx;
-    RandDrbgNewCtx provNewCtx;
+    RandDrbgNewCtx newCtx;
     RandDrbgInst inst;
     RandDrbgUnInst unInst;
     RandDrbgGen gen;
@@ -411,6 +395,12 @@ typedef enum {
     CRYPT_CTRL_GET_ITER,            /* kdf get iter . */
     CRYPT_CTRL_GET_KEYLEN           /* kdf get keyLen . */
 } CRYPT_KdfCtrl;
+
+typedef enum {
+    CRYPT_PKEY_CHECK_KEYPAIR = 1, /**< Check the key pair. */
+    CRYPT_PKEY_CHECK_PRVKEY = 2,  /**< Check the private key. */
+    CRYPT_PKEY_CHECK_MAX,
+} CRYPT_KeyCheckType;
 
 #ifdef __cplusplus
 }

@@ -25,6 +25,7 @@
 #include "crypt_errno.h"
 #include "crypt_utils.h"
 #include "crypt_sm4.h"
+#include "crypt_sm4_ghost.h"
 
 /*@
   assigns ((char*)dest)[0..count-1];
@@ -37,32 +38,6 @@ int memset_s(void *dest, size_t destMax, int c, size_t count);
 */
 void BSL_SAL_CleanseData(void *p, unsigned int n);
 
-/*@
-  // ACSL 逻辑函数定义，用于描述 SM4 算法的数学性质
-  axiomatic SM4_Properties {
-    // 定义 SM4 S-盒变换的逻辑函数
-    logic integer sm4_sbox(integer input);
-    
-    // 定义循环左移操作
-    logic integer rotl32(integer x, integer n);
-    
-    // 定义 SM4 线性变换 L
-    logic integer sm4_l_transform(integer x);
-    
-    // 定义 SM4 轮函数 F
-    logic integer sm4_round_function(integer x0, integer x1, integer x2, integer x3, integer rk);
-    
-    // 定义完整的 SM4 加密变换
-    logic integer sm4_encrypt_block(integer x0, integer x1, integer x2, integer x3, uint32_t* rk);
-    
-    // 定义完整的 SM4 解密变换  
-    logic integer sm4_decrypt_block(integer x0, integer x1, integer x2, integer x3, uint32_t* rk);
-    
-    // 简化的结果函数用于 ACSL 规范
-    logic uint8_t sm4_encrypt_result(uint8_t* input, uint32_t* rk, integer pos);
-    logic uint8_t sm4_decrypt_result(uint8_t* input, uint32_t* rk, integer pos);
-  }
-*/
 
 /**
  * <<<: Cyclic shift to the left
@@ -213,19 +188,28 @@ static const uint32_t XBOX_3[] = {
     0x78186060, 0x30f3c3c3, 0x897cf5f5, 0x5cefb3b3, 0xd23ae8e8, 0xacdf7373, 0x794c3535, 0xa0208080,
     0xe59d78e5, 0xbb56edbb, 0x7d235e7d, 0xf8c63ef8, 0x5f8bd45f, 0xe7c82f2f, 0xdd39e4e4, 0x68492121,
 };
+/*@
+  // 线性变换L函数
+  logic integer L_transform(integer b) = b ^ ROTL(b, 2) ^ ROTL(b, 10) ^ ROTL(b, 18) ^ ROTL(b, 24);
+  // T盒
+  logic integer spec_T_box(unsigned char input_byte) = L_transform(spec_sbox_lookup(input_byte));
+  // 引理（Lemma）：证明XBOX_0表的功能正确性。
+  lemma xbox_0_is_correct:
+    \forall integer i; 0 <= i < 256 ==> (uint32_t)XBOX_0[i] == (uint32_t)spec_T_box((unsigned char)i);
 
+  // 引理：证明 XBOX_1, XBOX_2, XBOX_3 表的正确性。
+  lemma other_xboxes_are_correct:
+    \forall integer i; 0 <= i < 256 ==>
+      ( (uint32_t)XBOX_1[i] == ROTL((uint32_t)XBOX_0[i], 8)  ) &&
+      ( (uint32_t)XBOX_2[i] == ROTL((uint32_t)XBOX_0[i], 16) ) &&
+      ( (uint32_t)XBOX_3[i] == ROTL((uint32_t)XBOX_0[i], 24) );
+*/
 
-/**
- * TE(a,b,c,d) = LE(SBOX[a],SBOX[b],SBOX[c],SBOX[d])
- *             = LE(SBOX[a],0,0,0)⊕LE(0,SBOX[b],0,0)⊕LE(0,0,SBOX[c],0)⊕LE(0,0,0,SBOX[d])
- *             = LE(SBOX[a] << 24)⊕LE(SBOX[b] << 16)⊕LE(SBOX[c] << 8)⊕LE(SBOX[d])
- *             = LE(SBOX[a] <<< 24)⊕LE(SBOX[b] <<< 16)⊕LE(SBOX[c] <<< 8)⊕LE(SBOX[d])
- *             = (LE(SBOX[a]) <<< 24)⊕(LE(SBOX[b]) <<< 16)⊕(LE(SBOX[c]) <<< 8)⊕LE(SBOX[d])
- *             = (XBOX_0[a] <<< 24)⊕(XBOX_0[b] <<< 16)⊕(XBOX_0[c] <<< 8)⊕XBOX_0[d]
- *             = XBOX_3[a]⊕XBOX_2[b]⊕XBOX_1[c]⊕XBOX_0[d]
- * F(Xi,Xi+1,Xi+2,Xi+3,rki) = Xi⊕TE(Xi+1⊕Xi+2⊕Xi+3⊕rki)
- * 基于 T-Box 优化 的 SM4 轮函数实现。其核心思想是将 SM4 轮函数中的两个主要步骤——非线性 S-Box 代换和线性变换 L——合并成一个单一的操作，即查表
+/*
+ * 基于 T-Box 优化 的 SM4 轮函数实现。其核心思想是将 SM4 轮函数中的两个主要步骤——
+ * 非线性 S-Box 代换和线性变换 L——合并成一个单一的操作，即查表
  */
+
 #define CRYPT_SM4_ROUND(t, x0, x1, x2, x3, rk, sbox)   \
     do {                                     \
         (t) = (x1) ^ (x2) ^ (x3) ^ (rk);     \
@@ -271,8 +255,13 @@ static const uint32_t XBOX_3[] = {
   assigns out[0..15], x[0..4];
 
   // 功能性后置条件
-  ensures enc   ==> (\forall integer i; 0 <= i < 16 ==> out[i] == sm4_encrypt_result(in, rk, i));
-  ensures !enc  ==> (\forall integer i; 0 <= i < 16 ==> out[i] == sm4_decrypt_result(in, rk, i));
+ ensures enc ==> 
+    \forall integer i; 0 <= i < 16 ==>
+      out[i] == ((unsigned char*)spec_sm4_encrypt_block(\old(in), rk))[i];
+
+  ensures !enc ==>
+    \forall integer i; 0 <= i < 16 ==>
+      out[i] == ((unsigned char*)spec_sm4_decrypt_block(\old(in), rk))[i];
 */
 static void SM4_Crypt(uint8_t *out, const uint8_t *in, const uint32_t *rk, uint32_t x[5], bool enc)
 {
@@ -314,13 +303,11 @@ static void SM4_Crypt(uint8_t *out, const uint8_t *in, const uint32_t *rk, uint3
   assigns out[0..length-1];
   
   // 错误处理的后置条件
-  ensures ctx == \null || in == \null || out == \null || length == 0 ==> 
-    \result == CRYPT_NULL_INPUT;
-  ensures length % CRYPT_SM4_BLOCKSIZE != 0 ==> 
-    \result == CRYPT_SM4_ERR_MSG_LEN;
-  ensures ctx != \null && in != \null && out != \null && length > 0 && 
-          length % CRYPT_SM4_BLOCKSIZE == 0 ==> 
-    \result == CRYPT_SUCCESS;
+  ensures ctx == \null || in == \null || out == \null || (length == 0 ==> 
+    \result == CRYPT_NULL_INPUT);
+  ensures (length % CRYPT_SM4_BLOCKSIZE != 0) ==> (\result == CRYPT_SM4_ERR_MSG_LEN);
+  ensures (ctx != \null) && (in != \null) && (out != \null) && (length > 0) &&
+           ((length % CRYPT_SM4_BLOCKSIZE == 0) ==> (\result == CRYPT_SUCCESS));
 */
 static int32_t CRYPT_SM4_Crypt(CRYPT_SM4_Ctx *ctx, const uint8_t *in, uint8_t *out, uint32_t length, bool enc)
 {

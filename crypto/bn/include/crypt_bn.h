@@ -848,7 +848,7 @@ int32_t BN_RandRange(BN_BigNum *r, const BN_BigNum *p);
 /**
  * @ingroup bn
  * @brief generate random BigNum
- * 
+ *
  * @param libCtx [IN] provider libCtx
  * @param r [OUT] Generate a random number.
  * @param p [IN] Compare data so that the generated r < p
@@ -1045,6 +1045,16 @@ void BN_OptimizerDestroy(BN_Optimizer *opt);
  * @retval none
  */
 void BN_OptimizerSetLibCtx(void *libCtx, BN_Optimizer *opt);
+
+/**
+ * @ingroup bn
+ * @brief get library context
+ *
+ * @param opt [In] BigNum optimizer
+ *
+ * @retval library context
+ */
+void *BN_OptimizerGetLibCtx(BN_Optimizer *opt);
 
 /**
  * @ingroup bn
@@ -1451,7 +1461,7 @@ void OptimizerEnd(BN_Optimizer *opt);
  */
 BN_BigNum *OptimizerGetBn(BN_Optimizer *opt, uint32_t room);
 
-#ifdef HITLS_CRYPTO_PAILLIER
+#if defined(HITLS_CRYPTO_PAILLIER) || defined(HITLS_CRYPTO_RSA_CHECK)
 /**
  * @ingroup bn
  * @brief BigNum Calculate the least common multiple
@@ -1467,7 +1477,8 @@ BN_BigNum *OptimizerGetBn(BN_Optimizer *opt, uint32_t room);
  * @retval CRYPT_MEM_ALLOC_FAIL         Memory allocation failure
  */
 int32_t BN_Lcm(BN_BigNum *r, const BN_BigNum *a, const BN_BigNum *b, BN_Optimizer *opt);
-#endif
+
+#endif // HITLS_CRYPTO_PAILLIER || HITLS_CRYPTO_RSA_CHECK
 
 /**
  * @ingroup bn

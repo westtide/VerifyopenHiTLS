@@ -21,6 +21,7 @@
 #include "crypt_utils.h"
 #include "bsl_err_internal.h"
 #include "crypt_sm4.h"
+#include "crypt_sm4_ghost.h"
 
 /* System parameter FK (originating GB/T 32907-2016 7.3 b or GM/T 0002-2012 7.3 2) */
 static const uint32_t FK[] = {0xa3b1bac6, 0x56aa3350, 0x677d9197, 0xb27022dc};
@@ -201,6 +202,22 @@ static const uint32_t KBOX_3[] = {
         KROUND((t), (k2), (k3), (k0), (k1), CK[(i) + 2], sbox, (rk)[(i) + 2]);  \
         KROUND((t), (k3), (k0), (k1), (k2), CK[(i) + 3], sbox, (rk)[(i) + 3]);  \
     }
+
+/*@
+  requires \valid(ctx);
+  requires \valid_read(key + (0..keyLen-1));
+  requires keyLen == CRYPT_SM4_BLOCKSIZE; // 密钥长度必须为16字节
+
+  assigns ctx->rk[0..31]; // 指明函数只会修改轮密钥
+
+  ensures
+    // 功能正确性：确保生成的轮密钥与幽灵模型计算的结果完全一致
+    \result == CRYPT_SUCCESS ==>
+    \forall integer i; 0 <= i < 32 ==>
+      ctx->rk[i] == spec_sm4_round_key(key, i);
+
+  ensures \result != CRYPT_SUCCESS <==> (ctx == \null || key == \null || keyLen != CRYPT_SM4_BLOCKSIZE);
+*/
 
 int32_t CRYPT_SM4_SetKey(CRYPT_SM4_Ctx *ctx, const uint8_t *key, uint32_t keyLen)
 {

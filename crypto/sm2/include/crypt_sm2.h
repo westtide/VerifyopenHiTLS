@@ -157,6 +157,63 @@ int32_t CRYPT_SM2_Verify(const CRYPT_SM2_Ctx *ctx, int32_t algId, const uint8_t 
  * @brief SM2 Set the private key data.
  *
  * @param ctx [OUT] sm2 context structure
+ * @param prv [IN] External private key data
+ *
+ * @retval CRYPT_NULL_INPUT     Error null pointer input
+ * @retval CRYPT_MEM_ALLOC_FAIL Memory allocation failure
+ * @retval ECC error.           An error occurred in the internal ECC calculation.
+ * @retval CRYPT_SUCCESS        set successfully.
+ */
+int32_t CRYPT_SM2_SetPrvKey(CRYPT_SM2_Ctx *ctx, const CRYPT_Sm2Prv *prv);
+
+/**
+ * @ingroup sm2
+ * @brief SM2 Set the public key data.
+ *
+ * @param ctx [OUT] sm2 context structure
+ * @param pub [IN] External public key data
+ *
+ * @retval CRYPT_NULL_INPUT     Invalid null pointer input
+ * @retval CRYPT_MEM_ALLOC_FAIL Memory allocation failure
+ * @retval ECC error.           An error occurred in the internal ECC calculation.
+ * @retval CRYPT_SUCCESS        set successfully.
+ */
+int32_t CRYPT_SM2_SetPubKey(CRYPT_SM2_Ctx *ctx, const CRYPT_DsaPub *pub);
+
+/**
+ * @ingroup sm2
+ * @brief SM2 Obtain the private key data.
+ *
+ * @param ctx [IN] sm2 context structure
+ * @param prv [OUT] External private key data
+ *
+ * @retval CRYPT_NULL_INPUT             Error null pointer input
+ * @retval CRYPT_ECC_PKEY_ERR_EMPTY_KEY The key is empty.
+ * @retval ECC error.                   An error occurred in the internal ECC calculation.
+ * @retval CRYPT_SUCCESS                obtained successfully.
+ */
+int32_t CRYPT_SM2_GetPrvKey(const CRYPT_SM2_Ctx *ctx, CRYPT_DsaPrv *prv);
+
+/**
+ * @ingroup sm2
+ * @brief SM2 Obtain the public key data.
+ *
+ * @param ctx [IN] sm2 context structure
+ * @param pub [OUT] External public key data
+ *
+ * @retval CRYPT_NULL_INPUT             Invalid null pointer input
+ * @retval CRYPT_ECC_PKEY_ERR_EMPTY_KEY The key is empty.
+ * @retval ECC error.                   An error occurred in the internal ECC calculation.
+ * @retval CRYPT_SUCCESS                Obtained successfully.
+ */
+int32_t CRYPT_SM2_GetPubKey(const CRYPT_SM2_Ctx *ctx, CRYPT_DsaPub *pub);
+
+#ifdef HITLS_BSL_PARAMS
+/**
+ * @ingroup sm2
+ * @brief SM2 Set the private key data.
+ *
+ * @param ctx [OUT] sm2 context structure
  * @param para [IN] External private key data
  *
  * @retval CRYPT_NULL_INPUT     Error null pointer input
@@ -164,7 +221,7 @@ int32_t CRYPT_SM2_Verify(const CRYPT_SM2_Ctx *ctx, int32_t algId, const uint8_t 
  * @retval ECC error.           An error occurred in the internal ECC calculation.
  * @retval CRYPT_SUCCESS        set successfully.
  */
-int32_t CRYPT_SM2_SetPrvKey(CRYPT_SM2_Ctx *ctx, const BSL_Param *para);
+int32_t CRYPT_SM2_SetPrvKeyEx(CRYPT_SM2_Ctx *ctx, const BSL_Param *para);
 
 /**
  * @ingroup sm2
@@ -178,7 +235,7 @@ int32_t CRYPT_SM2_SetPrvKey(CRYPT_SM2_Ctx *ctx, const BSL_Param *para);
  * @retval ECC error.           An error occurred in the internal ECC calculation.
  * @retval CRYPT_SUCCESS        set successfully.
  */
-int32_t CRYPT_SM2_SetPubKey(CRYPT_SM2_Ctx *ctx, const BSL_Param *para);
+int32_t CRYPT_SM2_SetPubKeyEx(CRYPT_SM2_Ctx *ctx, const BSL_Param *para);
 
 /**
  * @ingroup sm2
@@ -192,7 +249,7 @@ int32_t CRYPT_SM2_SetPubKey(CRYPT_SM2_Ctx *ctx, const BSL_Param *para);
  * @retval ECC error.                   An error occurred in the internal ECC calculation.
  * @retval CRYPT_SUCCESS                obtained successfully.
  */
-int32_t CRYPT_SM2_GetPrvKey(const CRYPT_SM2_Ctx *ctx, BSL_Param *para);
+int32_t CRYPT_SM2_GetPrvKeyEx(const CRYPT_SM2_Ctx *ctx, BSL_Param *para);
 
 /**
  * @ingroup sm2
@@ -206,7 +263,8 @@ int32_t CRYPT_SM2_GetPrvKey(const CRYPT_SM2_Ctx *ctx, BSL_Param *para);
  * @retval ECC error.                   An error occurred in the internal ECC calculation.
  * @retval CRYPT_SUCCESS                Obtained successfully.
  */
-int32_t CRYPT_SM2_GetPubKey(const CRYPT_SM2_Ctx *ctx, BSL_Param *para);
+int32_t CRYPT_SM2_GetPubKeyEx(const CRYPT_SM2_Ctx *ctx, BSL_Param *para);
+#endif
 
 /**
  * @ingroup sm2
@@ -293,6 +351,40 @@ int32_t CRYPT_SM2_Cmp(const CRYPT_SM2_Ctx *a, const CRYPT_SM2_Ctx *b);
  * @retval security bits
  */
 int32_t CRYPT_SM2_GetSecBits(const CRYPT_SM2_Ctx *ctx);
+
+/**
+ * @ingroup sm2
+ * @brief sm2 import key
+ *
+ * @param ctx [IN/OUT] sm2 context structure
+ * @param params [IN] key parameters
+ */
+int32_t CRYPT_SM2_Import(CRYPT_SM2_Ctx *ctx, const BSL_Param *params);
+
+/**
+ * @ingroup sm2
+ * @brief sm2 export key
+ *
+ * @param ctx [IN] sm2 context structure
+ * @param params [IN/OUT] key parameters
+ */
+int32_t CRYPT_SM2_Export(const CRYPT_SM2_Ctx *ctx, BSL_Param *params);
+
+#ifdef HITLS_CRYPTO_SM2_CHECK
+/**
+ * @ingroup sm2
+ * @brief sm2 check public key
+ *
+ * @param checkType [IN] check type
+ * @param pkey1 [IN] sm2 context structure
+ * @param pkey2 [IN] sm2 context structure
+ *
+ * @retval CRYPT_SUCCESS    is the same
+ * Others. For details, see error code in errno.
+ */
+int32_t CRYPT_SM2_Check(uint32_t checkType, const CRYPT_SM2_Ctx *pkey1, const CRYPT_SM2_Ctx *pkey2);
+
+#endif // HITLS_CRYPTO_SM2_CHECK
 
 #ifdef __cplusplus
 }

@@ -31,12 +31,12 @@
 #include "eal_md_local.h"
 #include "eal_common.h"
 #include "crypt_eal_implprovider.h"
-#include "crypt_eal_pkey.h"
 #include "crypt_ealinit.h"
 #include "bsl_err_internal.h"
 #include "crypt_provider.h"
 #include "bsl_params.h"
 #include "crypt_params_key.h"
+#include "eal_pkey.h"
 
 static void EalPkeyCopyMethod(const EAL_PkeyMethod *method, EAL_PkeyUnitaryMethod *dest)
 {
@@ -59,6 +59,8 @@ static void EalPkeyCopyMethod(const EAL_PkeyMethod *method, EAL_PkeyUnitaryMetho
     dest->computeShareKey = method->computeShareKey;
     dest->encrypt = method->encrypt;
     dest->decrypt = method->decrypt;
+    dest->headd = method->headd;
+    dest->hemul = method->hemul;
     dest->check = method->check;
     dest->cmp = method->cmp;
     dest->encaps = method->encaps;
@@ -157,7 +159,7 @@ int32_t CRYPT_EAL_PkeyCopyCtx(CRYPT_EAL_PkeyCtx *to, const CRYPT_EAL_PkeyCtx *fr
         to->method->freeCtx(to->key);
         to->key = NULL;
     }
-
+    BSL_SAL_ReferencesFree(&(to->references));
     return PkeyCopyCtx(to, from);
 }
 
@@ -198,7 +200,6 @@ void CRYPT_EAL_PkeyFreeCtx(CRYPT_EAL_PkeyCtx *pkey)
     if (ref > 0) {
         return;
     }
-    EAL_EventReport(CRYPT_EVENT_ZERO, CRYPT_ALGO_PKEY, pkey->id, CRYPT_SUCCESS);
     BSL_SAL_ReferencesFree(&(pkey->references));
     pkey->method->freeCtx(pkey->key);
     BSL_SAL_FREE(pkey->method);
@@ -235,7 +236,7 @@ static int32_t SetDsaParams(CRYPT_EAL_PkeyCtx *pkey, const CRYPT_DsaPara *dsaPar
 static int32_t SetRsaParams(CRYPT_EAL_PkeyCtx *pkey, const CRYPT_RsaPara *rsaPara)
 {
     uint32_t bits = rsaPara->bits;
-    BSL_Param param[3] = {
+    BSL_Param param[] = {
         {CRYPT_PARAM_RSA_E, BSL_PARAM_TYPE_OCTETS, rsaPara->e, rsaPara->eLen, 0},
         {CRYPT_PARAM_RSA_BITS, BSL_PARAM_TYPE_UINT32, &bits, sizeof(bits), 0},
         BSL_PARAM_END
@@ -373,7 +374,7 @@ static int32_t CvtBslParamAndSetParams(CRYPT_EAL_PkeyCtx *pkey, const CRYPT_EAL_
         case CRYPT_PKEY_PAILLIER:
             ret = SetPaillierParams(pkey, &para->para.paillierPara);
             break;
-         case CRYPT_PKEY_ELGAMAL:
+        case CRYPT_PKEY_ELGAMAL:
             ret = SetElGamalParams(pkey, &para->para.elgamalPara);
             break;
         case CRYPT_PKEY_ED25519:
@@ -431,6 +432,25 @@ int32_t CRYPT_EAL_PkeySetPara(CRYPT_EAL_PkeyCtx *pkey, const CRYPT_EAL_PkeyPara 
         return CRYPT_EAL_ALG_NOT_SUPPORT;
     }
     ret = CvtBslParamAndSetParams(pkey, para);
+    if (ret != CRYPT_SUCCESS) {
+        EAL_ERR_REPORT(CRYPT_EVENT_ERR, CRYPT_ALGO_PKEY, pkey->id, ret);
+    }
+    return ret;
+}
+
+int32_t CRYPT_EAL_PkeySetParaEx(CRYPT_EAL_PkeyCtx *pkey, const BSL_Param *param)
+{
+    if (pkey == NULL || param == NULL) {
+        EAL_ERR_REPORT(CRYPT_EVENT_ERR, CRYPT_ALGO_PKEY, CRYPT_PKEY_MAX, CRYPT_NULL_INPUT);
+        return CRYPT_NULL_INPUT;
+    }
+
+    if (pkey->method == NULL || pkey->method->setPara == NULL) {
+        EAL_ERR_REPORT(CRYPT_EVENT_ERR, CRYPT_ALGO_PKEY, pkey->id, CRYPT_EAL_ALG_NOT_SUPPORT);
+        return CRYPT_EAL_ALG_NOT_SUPPORT;
+    }
+
+    int32_t ret = pkey->method->setPara(pkey->key, param);
     if (ret != CRYPT_SUCCESS) {
         EAL_ERR_REPORT(CRYPT_EVENT_ERR, CRYPT_ALGO_PKEY, pkey->id, ret);
     }
@@ -498,8 +518,6 @@ int32_t CRYPT_EAL_PkeyGen(CRYPT_EAL_PkeyCtx *pkey)
         EAL_ERR_REPORT(CRYPT_EVENT_ERR, CRYPT_ALGO_PKEY, pkey->id, ret);
         return ret;
     }
-
-    EAL_EventReport(CRYPT_EVENT_GEN, CRYPT_ALGO_PKEY, pkey->id, CRYPT_SUCCESS);
     return CRYPT_SUCCESS;
 }
 
@@ -570,7 +588,7 @@ int32_t CRYPT_EAL_PkeySetPub(CRYPT_EAL_PkeyCtx *pkey, const CRYPT_EAL_PkeyPub *k
         case CRYPT_PKEY_ECDH:
         case CRYPT_PKEY_ECDSA:
         case CRYPT_PKEY_SM2: {
-            BSL_Param ecParam[2] = {{CRYPT_PARAM_EC_POINT_UNCOMPRESSED, BSL_PARAM_TYPE_OCTETS, key->key.eccPub.data,
+            BSL_Param ecParam[2] = {{CRYPT_PARAM_EC_PUBKEY, BSL_PARAM_TYPE_OCTETS, key->key.eccPub.data,
                 key->key.eccPub.len, 0}, BSL_PARAM_END};
             ret = pkey->method->setPub(pkey->key, &ecParam);
             break;
@@ -620,6 +638,15 @@ int32_t CRYPT_EAL_PkeySetPub(CRYPT_EAL_PkeyCtx *pkey, const CRYPT_EAL_PkeyPub *k
             ret = pkey->method->setPub(pkey->key, &slhDsaPub);
             break;
         }
+        case CRYPT_PKEY_XMSS: {
+            BSL_Param xmssPub[3] = {
+                {CRYPT_PARAM_XMSS_PUB_SEED, BSL_PARAM_TYPE_OCTETS, key->key.xmssPub.seed, key->key.xmssPub.len, 0},
+                {CRYPT_PARAM_XMSS_PUB_ROOT, BSL_PARAM_TYPE_OCTETS, key->key.xmssPub.root, key->key.xmssPub.len, 0},
+                BSL_PARAM_END,
+            };
+            ret = pkey->method->setPub(pkey->key, &xmssPub);
+            break;
+        }
 		case CRYPT_PKEY_HYBRID_KEM: {
             BSL_Param paParam[2] = {{CRYPT_PARAM_HYBRID_PUBKEY, BSL_PARAM_TYPE_OCTETS, key->key.kemEk.data,
                 key->key.kemEk.len, 0},
@@ -627,11 +654,12 @@ int32_t CRYPT_EAL_PkeySetPub(CRYPT_EAL_PkeyCtx *pkey, const CRYPT_EAL_PkeyPub *k
             ret = pkey->method->setPub(pkey->key, &paParam);
             break;
         }
-        case CRYPT_PKEY_MAX:
+        default:
             ret = CRYPT_EAL_ALG_NOT_SUPPORT;
     }
-
-    EAL_EventReport((ret == CRYPT_SUCCESS) ? CRYPT_EVENT_SETSSP : CRYPT_EVENT_ERR, CRYPT_ALGO_PKEY, pkey->id, ret);
+    if (ret != CRYPT_SUCCESS) {
+        EAL_ERR_REPORT(CRYPT_EVENT_ERR, CRYPT_ALGO_PKEY, pkey->id, ret);
+    }
     return ret;
 }
 
@@ -714,6 +742,19 @@ int32_t CRYPT_EAL_PkeySetPrv(CRYPT_EAL_PkeyCtx *pkey, const CRYPT_EAL_PkeyPrv *k
             ret = pkey->method->setPrv(pkey->key, &slhDsaParam);
             break;
         }
+        case CRYPT_PKEY_XMSS: {
+            uint64_t index = key->key.xmssPrv.index;
+            BSL_Param xmssParam[6] = {
+                {CRYPT_PARAM_XMSS_PRV_SEED, BSL_PARAM_TYPE_OCTETS, key->key.xmssPrv.seed, key->key.xmssPrv.pub.len, 0},
+                {CRYPT_PARAM_XMSS_PRV_PRF, BSL_PARAM_TYPE_OCTETS, key->key.xmssPrv.prf, key->key.xmssPrv.pub.len, 0},
+                {CRYPT_PARAM_XMSS_PRV_INDEX, BSL_PARAM_TYPE_UINT64, &index, sizeof(index), 0},
+                {CRYPT_PARAM_XMSS_PUB_SEED, BSL_PARAM_TYPE_OCTETS, key->key.xmssPrv.pub.seed, key->key.xmssPrv.pub.len, 0},
+                {CRYPT_PARAM_XMSS_PUB_ROOT, BSL_PARAM_TYPE_OCTETS, key->key.xmssPrv.pub.root, key->key.xmssPrv.pub.len, 0},
+                BSL_PARAM_END,
+            };
+            ret = pkey->method->setPrv(pkey->key, &xmssParam);
+            break;
+        }
         case CRYPT_PKEY_ELGAMAL: {
             BSL_Param paParam[4] = {
                 {CRYPT_PARAM_ELGAMAL_P, BSL_PARAM_TYPE_OCTETS, key->key.elgamalPrv.p, key->key.elgamalPrv.pLen, 0},
@@ -744,11 +785,12 @@ int32_t CRYPT_EAL_PkeySetPrv(CRYPT_EAL_PkeyCtx *pkey, const CRYPT_EAL_PkeyPrv *k
             ret = pkey->method->setPrv(pkey->key, &paParam);
             break;
         }
-        case CRYPT_PKEY_MAX:
+        default:
             ret = CRYPT_EAL_ALG_NOT_SUPPORT;
     }
-
-    EAL_EventReport((ret == CRYPT_SUCCESS) ? CRYPT_EVENT_SETSSP : CRYPT_EVENT_ERR, CRYPT_ALGO_PKEY, pkey->id, ret);
+    if (ret != CRYPT_SUCCESS) {
+        EAL_ERR_REPORT(CRYPT_EVENT_ERR, CRYPT_ALGO_PKEY, pkey->id, ret);
+    }
     return ret;
 }
 
@@ -947,6 +989,22 @@ static int32_t GetSlhDsaPub(const CRYPT_EAL_PkeyCtx *pkey, CRYPT_SlhDsaPub *pub)
     return CRYPT_SUCCESS;
 }
 
+static int32_t GetXmssPub(const CRYPT_EAL_PkeyCtx *pkey, CRYPT_XmssPub *pub)
+{
+    BSL_Param param[3] = {
+        {CRYPT_PARAM_XMSS_PUB_SEED, BSL_PARAM_TYPE_OCTETS, pub->seed, pub->len, 0},
+        {CRYPT_PARAM_XMSS_PUB_ROOT, BSL_PARAM_TYPE_OCTETS, pub->root, pub->len, 0},
+        BSL_PARAM_END,
+    };
+    int32_t ret = pkey->method->getPub(pkey->key, &param);
+    if (ret != CRYPT_SUCCESS) {
+        BSL_ERR_PUSH_ERROR(ret);
+        return ret;
+    }
+    pub->len = param[0].useLen;
+    return CRYPT_SUCCESS;
+}
+
 int32_t CRYPT_EAL_PkeyGetPub(const CRYPT_EAL_PkeyCtx *pkey, CRYPT_EAL_PkeyPub *key)
 {
     int32_t ret = PriAndPubParamIsValid(pkey, key, false);
@@ -976,7 +1034,7 @@ int32_t CRYPT_EAL_PkeyGetPub(const CRYPT_EAL_PkeyCtx *pkey, CRYPT_EAL_PkeyPub *k
         case CRYPT_PKEY_ECDH:
         case CRYPT_PKEY_ECDSA:
         case CRYPT_PKEY_SM2:
-            ret = GetCommonPub(pkey, CRYPT_PARAM_EC_POINT_UNCOMPRESSED, &key->key.eccPub);
+            ret = GetCommonPub(pkey, CRYPT_PARAM_EC_PUBKEY, &key->key.eccPub);
             break;
         case CRYPT_PKEY_PAILLIER:
             ret = GetPaillierPub(pkey, &key->key.paillierPub);
@@ -996,11 +1054,15 @@ int32_t CRYPT_EAL_PkeyGetPub(const CRYPT_EAL_PkeyCtx *pkey, CRYPT_EAL_PkeyPub *k
         case CRYPT_PKEY_SLH_DSA:
             ret = GetSlhDsaPub(pkey, &key->key.slhDsaPub);
             break;
-        case CRYPT_PKEY_MAX:
+        case CRYPT_PKEY_XMSS:
+            ret = GetXmssPub(pkey, &key->key.xmssPub);
+            break;
+        default:
             ret = CRYPT_EAL_ALG_NOT_SUPPORT;
     }
-
-    EAL_EventReport((ret == CRYPT_SUCCESS) ? CRYPT_EVENT_GETSSP : CRYPT_EVENT_ERR, CRYPT_ALGO_PKEY, pkey->id, ret);
+    if (ret != CRYPT_SUCCESS) {
+        EAL_ERR_REPORT(CRYPT_EVENT_ERR, CRYPT_ALGO_PKEY, pkey->id, ret);
+    }
     return ret;
 }
 
@@ -1138,6 +1200,24 @@ static int32_t GetSlhDsaPrv(const CRYPT_EAL_PkeyCtx *pkey, CRYPT_SlhDsaPrv *prv)
     return CRYPT_SUCCESS;
 }
 
+static int32_t GetXmssPrv(const CRYPT_EAL_PkeyCtx *pkey, CRYPT_XmssPrv *prv)
+{
+    BSL_Param param[6] = {
+        {CRYPT_PARAM_XMSS_PRV_SEED, BSL_PARAM_TYPE_OCTETS, prv->seed, prv->pub.len, 0},
+        {CRYPT_PARAM_XMSS_PRV_PRF, BSL_PARAM_TYPE_OCTETS, prv->prf, prv->pub.len, 0},
+        {CRYPT_PARAM_XMSS_PRV_INDEX, BSL_PARAM_TYPE_UINT64, &prv->index, sizeof(prv->index), 0},
+        {CRYPT_PARAM_XMSS_PUB_SEED, BSL_PARAM_TYPE_OCTETS, prv->pub.seed, prv->pub.len, 0},
+        {CRYPT_PARAM_XMSS_PUB_ROOT, BSL_PARAM_TYPE_OCTETS, prv->pub.root, prv->pub.len, 0},
+        BSL_PARAM_END,
+    };
+    int32_t ret = pkey->method->getPrv(pkey->key, &param);
+    if (ret != CRYPT_SUCCESS) {
+        BSL_ERR_PUSH_ERROR(ret);
+        return ret;
+    }
+    prv->pub.len = param[0].useLen;
+    return CRYPT_SUCCESS;
+}
 
 int32_t CRYPT_EAL_PkeyGetPrv(const CRYPT_EAL_PkeyCtx *pkey, CRYPT_EAL_PkeyPrv *key)
 {
@@ -1184,14 +1264,18 @@ int32_t CRYPT_EAL_PkeyGetPrv(const CRYPT_EAL_PkeyCtx *pkey, CRYPT_EAL_PkeyPrv *k
         case CRYPT_PKEY_SLH_DSA:
             ret = GetSlhDsaPrv(pkey, &key->key.slhDsaPrv);
             break;
+        case CRYPT_PKEY_XMSS:
+            ret = GetXmssPrv(pkey, &key->key.xmssPrv);
+            break;
 		case CRYPT_PKEY_HYBRID_KEM:
             ret = GetHybridkemPrv(pkey, &key->key.kemDk);
             break;
-        case CRYPT_PKEY_MAX:
+        default:
             ret = CRYPT_EAL_ALG_NOT_SUPPORT;
     }
-
-    EAL_EventReport((ret == CRYPT_SUCCESS) ? CRYPT_EVENT_GETSSP : CRYPT_EVENT_ERR, CRYPT_ALGO_PKEY, pkey->id, ret);
+    if (ret != CRYPT_SUCCESS) {
+        EAL_ERR_REPORT(CRYPT_EVENT_ERR, CRYPT_ALGO_PKEY, pkey->id, ret);
+    }
     return ret;
 }
 
@@ -1349,6 +1433,12 @@ static int32_t CRYPT_EAL_SetKeyMethod(const CRYPT_EAL_Func *funcsKeyMgmt, EAL_Pk
                 case CRYPT_EAL_IMPLPKEYMGMT_FREECTX:
                     method->freeCtx = funcsKeyMgmt[index].func;
                     break;
+                case CRYPT_EAL_IMPLPKEYMGMT_IMPORT:
+                    method->import = funcsKeyMgmt[index].func;
+                    break;
+                case CRYPT_EAL_IMPLPKEYMGMT_EXPORT:
+                    method->export = funcsKeyMgmt[index].func;
+                    break;
                 default:
                     BSL_ERR_PUSH_ERROR(CRYPT_PROVIDER_ERR_UNEXPECTED_IMPL);
                     return CRYPT_PROVIDER_ERR_UNEXPECTED_IMPL;
@@ -1370,6 +1460,12 @@ static int32_t CRYPT_EAL_SetCipherMethod(const CRYPT_EAL_Func *funcsAsyCipher, E
                     break;
                 case CRYPT_EAL_IMPLPKEYCIPHER_DECRYPT:
                     method->decrypt = funcsAsyCipher[index].func;
+                    break;
+                case CRYPT_EAL_IMPLPKEYCIPHER_HEADD:
+                    method->headd = funcsAsyCipher[index].func;
+                    break;
+                case CRYPT_EAL_IMPLPKEYCIPHER_HEMUL:
+                    method->hemul = funcsAsyCipher[index].func;
                     break;
                 default:
                     BSL_ERR_PUSH_ERROR(CRYPT_PROVIDER_ERR_UNEXPECTED_IMPL);
@@ -1465,7 +1561,7 @@ static int32_t CRYPT_EAL_SetKemMethod(const CRYPT_EAL_Func *funcKem, EAL_PkeyUni
     return CRYPT_SUCCESS;
 }
 
-static int32_t CRYPT_EAL_SetPkeyMethod(CRYPT_EAL_PkeyCtx *ctx, const CRYPT_EAL_Func *funcsKeyMgmt,
+int32_t CRYPT_EAL_SetPkeyMethod(EAL_PkeyUnitaryMethod **pkeyMethod, const CRYPT_EAL_Func *funcsKeyMgmt,
     const CRYPT_EAL_Func *funcsAsyCipher, const CRYPT_EAL_Func *funcsExch, const CRYPT_EAL_Func *funcSign,
     const CRYPT_EAL_Func *funcKem)
 {
@@ -1504,91 +1600,82 @@ static int32_t CRYPT_EAL_SetPkeyMethod(CRYPT_EAL_PkeyCtx *ctx, const CRYPT_EAL_F
         BSL_SAL_FREE(method);
         return ret;
     }
-    ctx->method = method;
+    *pkeyMethod = method;
     return CRYPT_SUCCESS;
 }
 
-typedef struct {
-    void *provCtx;
-    CRYPT_EAL_Func *funcsAsyCipher;
-    CRYPT_EAL_Func *funcsExch;
-    CRYPT_EAL_Func *funcSign;
-    CRYPT_EAL_Func *funcKem;
-} CRYPT_EAL_AsyAlgFuncsInfo;
-
 static int32_t ProviderGetTargetFuncs(CRYPT_EAL_LibCtx *libCtx, int32_t operaId, int32_t algId,
-    const char *attrName, const CRYPT_EAL_Func **funcs, void **provCtx)
+    const char *attrName, const CRYPT_EAL_Func **funcs, CRYPT_EAL_ProvMgrCtx **mgrCtx)
 {
-    int32_t ret = CRYPT_EAL_ProviderGetFuncs(libCtx, operaId, algId, attrName, funcs, provCtx);
+    int32_t ret = CRYPT_EAL_ProviderGetFuncsAndMgrCtx(libCtx, operaId, algId, attrName, funcs, mgrCtx);
     return ret == CRYPT_NOT_SUPPORT ? CRYPT_SUCCESS : ret;
 }
 
-static int32_t ProviderGetAsyAlgFuncs(CRYPT_EAL_LibCtx *libCtx, int32_t algId, uint32_t pkeyOperType,
+int32_t CRYPT_EAL_ProviderGetAsyAlgFuncs(CRYPT_EAL_LibCtx *libCtx, int32_t algId, uint32_t pkeyOperType,
     const char *attrName, CRYPT_EAL_AsyAlgFuncsInfo *funcs)
 {
     int32_t ret = CRYPT_PROVIDER_NOT_SUPPORT;
     if (pkeyOperType == CRYPT_EAL_PKEY_UNKNOWN_OPERATE) {
         RETURN_RET_IF_ERR(ProviderGetTargetFuncs(libCtx, CRYPT_EAL_OPERAID_ASYMCIPHER, algId,
-            attrName, (const CRYPT_EAL_Func **)(uintptr_t)&funcs->funcsAsyCipher, &funcs->provCtx), ret);
+            attrName, &funcs->funcsAsyCipher, &funcs->mgrCtx), ret);
         RETURN_RET_IF_ERR(ProviderGetTargetFuncs(libCtx, CRYPT_EAL_OPERAID_KEYEXCH, algId,
-            attrName, (const CRYPT_EAL_Func **)(uintptr_t)&funcs->funcsExch, &funcs->provCtx), ret);
+            attrName, &funcs->funcsExch, &funcs->mgrCtx), ret);
         RETURN_RET_IF_ERR(ProviderGetTargetFuncs(libCtx, CRYPT_EAL_OPERAID_SIGN, algId,
-            attrName, (const CRYPT_EAL_Func **)(uintptr_t)&funcs->funcSign, &funcs->provCtx), ret);
+            attrName, &funcs->funcSign, &funcs->mgrCtx), ret);
         RETURN_RET_IF_ERR(ProviderGetTargetFuncs(libCtx, CRYPT_EAL_OPERAID_KEM, algId,
-            attrName, (const CRYPT_EAL_Func **)(uintptr_t)&funcs->funcKem, &funcs->provCtx), ret);
-        return ret;
+            attrName, &funcs->funcKem, &funcs->mgrCtx), ret);
     }
     if ((pkeyOperType & CRYPT_EAL_PKEY_CIPHER_OPERATE) == CRYPT_EAL_PKEY_CIPHER_OPERATE) {
-        ret = CRYPT_EAL_ProviderGetFuncs(libCtx, CRYPT_EAL_OPERAID_ASYMCIPHER, algId, attrName,
-            (const CRYPT_EAL_Func **)(uintptr_t)&funcs->funcsAsyCipher, &funcs->provCtx);
+        ret = CRYPT_EAL_ProviderGetFuncsAndMgrCtx(libCtx, CRYPT_EAL_OPERAID_ASYMCIPHER, algId, attrName,
+            &funcs->funcsAsyCipher, &funcs->mgrCtx);
         if (ret != CRYPT_SUCCESS) {
             BSL_ERR_PUSH_ERROR(ret);
             return ret;
         }
     }
     if ((pkeyOperType & CRYPT_EAL_PKEY_EXCH_OPERATE) == CRYPT_EAL_PKEY_EXCH_OPERATE) {
-        ret = CRYPT_EAL_ProviderGetFuncs(libCtx, CRYPT_EAL_OPERAID_KEYEXCH, algId, attrName,
-            (const CRYPT_EAL_Func **)(uintptr_t)&funcs->funcsExch, &funcs->provCtx);
+        ret = CRYPT_EAL_ProviderGetFuncsAndMgrCtx(libCtx, CRYPT_EAL_OPERAID_KEYEXCH, algId, attrName,
+            &funcs->funcsExch, &funcs->mgrCtx);
         if (ret != CRYPT_SUCCESS) {
             BSL_ERR_PUSH_ERROR(ret);
             return ret;
         }
     }
     if ((pkeyOperType & CRYPT_EAL_PKEY_SIGN_OPERATE) == CRYPT_EAL_PKEY_SIGN_OPERATE) {
-        ret = CRYPT_EAL_ProviderGetFuncs(libCtx, CRYPT_EAL_OPERAID_SIGN, algId, attrName,
-            (const CRYPT_EAL_Func **)(uintptr_t)&funcs->funcSign, &funcs->provCtx);
+        ret = CRYPT_EAL_ProviderGetFuncsAndMgrCtx(libCtx, CRYPT_EAL_OPERAID_SIGN, algId, attrName,
+            &funcs->funcSign, &funcs->mgrCtx);
         if (ret != CRYPT_SUCCESS) {
             BSL_ERR_PUSH_ERROR(ret);
             return ret;
         }
     }
     if ((pkeyOperType & CRYPT_EAL_PKEY_KEM_OPERATE) == CRYPT_EAL_PKEY_KEM_OPERATE) {
-        ret = CRYPT_EAL_ProviderGetFuncs(libCtx, CRYPT_EAL_OPERAID_KEM, algId, attrName,
-            (const CRYPT_EAL_Func **)(uintptr_t)&funcs->funcKem, &funcs->provCtx);
+        ret = CRYPT_EAL_ProviderGetFuncsAndMgrCtx(libCtx, CRYPT_EAL_OPERAID_KEM, algId, attrName,
+            &funcs->funcKem, &funcs->mgrCtx);
         if (ret != CRYPT_SUCCESS) {
             BSL_ERR_PUSH_ERROR(ret);
             return ret;
         }
     }
+    ret = CRYPT_EAL_ProviderGetFuncsAndMgrCtx(libCtx, CRYPT_EAL_OPERAID_KEYMGMT, algId, attrName,
+        &funcs->funcsKeyMgmt, &funcs->mgrCtx);
     if (ret != CRYPT_SUCCESS) {
         BSL_ERR_PUSH_ERROR(ret);
     }
     return ret;
 }
 
-CRYPT_EAL_PkeyCtx *CRYPT_EAL_ProviderPkeyNewCtx(CRYPT_EAL_LibCtx *libCtx, int32_t algId, uint32_t pkeyOperType,
+CRYPT_EAL_PkeyCtx *CRYPT_EAL_ProviderPkeyNewCtxInner(CRYPT_EAL_LibCtx *libCtx, int32_t algId, uint32_t pkeyOperType,
     const char *attrName)
 {
-    const CRYPT_EAL_Func *funcsKeyMgmt = NULL;
     void *provCtx = NULL;
-    CRYPT_EAL_AsyAlgFuncsInfo funcInfo = {NULL, NULL, NULL, NULL, NULL};
-    int32_t ret = ProviderGetAsyAlgFuncs(libCtx, algId, pkeyOperType, attrName, &funcInfo);
+    CRYPT_EAL_AsyAlgFuncsInfo funcInfo = {NULL, NULL, NULL, NULL, NULL, NULL};
+    int32_t ret = CRYPT_EAL_ProviderGetAsyAlgFuncs(libCtx, algId, pkeyOperType, attrName, &funcInfo);
     if (ret != CRYPT_SUCCESS) {
         EAL_ERR_REPORT(CRYPT_EVENT_ERR, CRYPT_ALGO_PKEY, algId, ret);
         return NULL;
     }
-    ret = CRYPT_EAL_ProviderGetFuncs(libCtx, CRYPT_EAL_OPERAID_KEYMGMT, algId, attrName,
-        &funcsKeyMgmt, &provCtx);
+    ret = CRYPT_EAL_ProviderCtrl(funcInfo.mgrCtx, CRYPT_PROVIDER_GET_USER_CTX, &provCtx, sizeof(provCtx));
     if (ret != CRYPT_SUCCESS) {
         EAL_ERR_REPORT(CRYPT_EVENT_ERR, CRYPT_ALGO_PKEY, algId, ret);
         return NULL;
@@ -1598,8 +1685,8 @@ CRYPT_EAL_PkeyCtx *CRYPT_EAL_ProviderPkeyNewCtx(CRYPT_EAL_LibCtx *libCtx, int32_
         EAL_ERR_REPORT(CRYPT_EVENT_ERR, CRYPT_ALGO_PKEY, algId, CRYPT_MEM_ALLOC_FAIL);
         return NULL;
     }
-    ret = CRYPT_EAL_SetPkeyMethod(ctx, funcsKeyMgmt, funcInfo.funcsAsyCipher, funcInfo.funcsExch, funcInfo.funcSign,
-        funcInfo.funcKem);
+    ret = CRYPT_EAL_SetPkeyMethod(&(ctx->method), funcInfo.funcsKeyMgmt, funcInfo.funcsAsyCipher, funcInfo.funcsExch,
+        funcInfo.funcSign, funcInfo.funcKem);
     if (ret != BSL_SUCCESS) {
         BSL_SAL_FREE(ctx);
         return NULL;
@@ -1610,7 +1697,8 @@ CRYPT_EAL_PkeyCtx *CRYPT_EAL_ProviderPkeyNewCtx(CRYPT_EAL_LibCtx *libCtx, int32_
         BSL_SAL_FREE(ctx);
         return NULL;
     }
-    ctx->key = ctx->method->provNewCtx(funcInfo.provCtx, algId);
+
+    ctx->key = ctx->method->provNewCtx(provCtx, algId);
     if (ctx->key == NULL) {
         EAL_ERR_REPORT(CRYPT_EVENT_ERR, CRYPT_ALGO_PKEY, algId, CRYPT_MEM_ALLOC_FAIL);
         BSL_SAL_FREE(ctx->method);
@@ -1623,4 +1711,18 @@ CRYPT_EAL_PkeyCtx *CRYPT_EAL_ProviderPkeyNewCtx(CRYPT_EAL_LibCtx *libCtx, int32_
     return ctx;
 }
 #endif // HITLS_CRYPTO_PROVIDER
+
+CRYPT_EAL_PkeyCtx *CRYPT_EAL_ProviderPkeyNewCtx(CRYPT_EAL_LibCtx *libCtx, int32_t algId, uint32_t pkeyOperType,
+    const char *attrName)
+{
+#ifdef HITLS_CRYPTO_PROVIDER
+    return CRYPT_EAL_ProviderPkeyNewCtxInner(libCtx, algId, pkeyOperType, attrName);
+#else
+    (void)libCtx;
+    (void)pkeyOperType;
+    (void)attrName;
+    return CRYPT_EAL_PkeyNewCtx(algId);
+#endif
+}
+
 #endif

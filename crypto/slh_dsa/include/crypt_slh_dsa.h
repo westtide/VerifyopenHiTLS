@@ -57,30 +57,6 @@ void CRYPT_SLH_DSA_FreeCtx(CryptSlhDsaCtx *ctx);
 int32_t CRYPT_SLH_DSA_Gen(CryptSlhDsaCtx *ctx);
 
 /**
- * @brief Sign data using SLH-DSA, the msg is pre-hashed, and the hash-id should be set before calling this function.
- * 
- * @param ctx Pointer to the SLH-DSA context
- * @param msg Pointer to the message to sign
- * @param msgLen Length of the message
- * @param sig Pointer to the signature
- * @param sigLen Length of the signature
- */
-int32_t CRYPT_SLH_DSA_SignData(CryptSlhDsaCtx *ctx, const uint8_t *msg, uint32_t msgLen, uint8_t *sig,
-                               uint32_t *sigLen);
-
-/**
- * @brief Verify data using SLH-DSA, the msg is pre-hashed, and the hash-id should be set before calling this function.
- * 
- * @param ctx Pointer to the SLH-DSA context
- * @param msg Pointer to the message to verify
- * @param msgLen Length of the message
- * @param sig Pointer to the signature
- * @param sigLen Length of the signature
- */
-int32_t CRYPT_SLH_DSA_VerifyData(const CryptSlhDsaCtx *ctx, const uint8_t *msg, uint32_t msgLen, uint8_t *sig,
-                                 uint32_t sigLen);
-
-/**
  * @brief Sign data using SLH-DSA
  * 
  * @param ctx Pointer to the SLH-DSA context
@@ -119,35 +95,85 @@ int32_t CRYPT_SLH_DSA_Ctrl(CryptSlhDsaCtx *ctx, int32_t opt, void *val, uint32_t
 
 /**
  * @brief Get the public key of SLH-DSA
- * 
+ *
  * @param ctx Pointer to the SLH-DSA context
- * @param para Pointer to the public key
+ * @param pub Pointer to the public key
  */
-int32_t CRYPT_SLH_DSA_GetPubKey(const CryptSlhDsaCtx *ctx, BSL_Param *para);
+int32_t CRYPT_SLH_DSA_GetPubKey(const CryptSlhDsaCtx *ctx, CRYPT_SlhDsaPub *pub);
 
 /**
  * @brief Get the private key of SLH-DSA
- * 
+ *
  * @param ctx Pointer to the SLH-DSA context
- * @param para Pointer to the private key
+ * @param prv Pointer to the private key
  */
-int32_t CRYPT_SLH_DSA_GetPrvKey(const CryptSlhDsaCtx *ctx, BSL_Param *para);
+int32_t CRYPT_SLH_DSA_GetPrvKey(const CryptSlhDsaCtx *ctx, CRYPT_SlhDsaPrv *prv);
 
 /**
  * @brief Set the public key of SLH-DSA
- * 
+ *
  * @param ctx Pointer to the SLH-DSA context
- * @param para Pointer to the public key
+ * @param pub Pointer to the public key
  */
-int32_t CRYPT_SLH_DSA_SetPubKey(CryptSlhDsaCtx *ctx, const BSL_Param *para);
+int32_t CRYPT_SLH_DSA_SetPubKey(CryptSlhDsaCtx *ctx, const CRYPT_SlhDsaPub *pub);
 
 /**
  * @brief Set the private key of SLH-DSA
- * 
+ *
+ * @param ctx Pointer to the SLH-DSA context
+ * @param prv Pointer to the private key
+ */
+int32_t CRYPT_SLH_DSA_SetPrvKey(CryptSlhDsaCtx *ctx, const CRYPT_SlhDsaPrv *prv);
+
+#ifdef HITLS_BSL_PARAMS
+/**
+ * @brief Get the public key of SLH-DSA
+ *
+ * @param ctx Pointer to the SLH-DSA context
+ * @param para Pointer to the public key
+ */
+int32_t CRYPT_SLH_DSA_GetPubKeyEx(const CryptSlhDsaCtx *ctx, BSL_Param *para);
+
+/**
+ * @brief Get the private key of SLH-DSA
+ *
  * @param ctx Pointer to the SLH-DSA context
  * @param para Pointer to the private key
  */
-int32_t CRYPT_SLH_DSA_SetPrvKey(CryptSlhDsaCtx *ctx, const BSL_Param *para);
+int32_t CRYPT_SLH_DSA_GetPrvKeyEx(const CryptSlhDsaCtx *ctx, BSL_Param *para);
+
+/**
+ * @brief Set the public key of SLH-DSA
+ *
+ * @param ctx Pointer to the SLH-DSA context
+ * @param para Pointer to the public key
+ */
+int32_t CRYPT_SLH_DSA_SetPubKeyEx(CryptSlhDsaCtx *ctx, const BSL_Param *para);
+
+/**
+ * @brief Set the private key of SLH-DSA
+ *
+ * @param ctx Pointer to the SLH-DSA context
+ * @param para Pointer to the private key
+ */
+int32_t CRYPT_SLH_DSA_SetPrvKeyEx(CryptSlhDsaCtx *ctx, const BSL_Param *para);
+#endif
+
+#ifdef HITLS_CRYPTO_SLH_DSA_CHECK
+
+/**
+ * @brief Check the key pair of SLH-DSA
+ *
+ * @param checkType Check type
+ * @param pkey1 Pointer to the first SLH-DSA context
+ * @param pkey2 Pointer to the second SLH-DSA context
+ *
+ * @retval CRYPT_SUCCESS    check success.
+ * Others. For details, see error code in errno.
+ */
+int32_t CRYPT_SLH_DSA_Check(uint32_t checkType, const CryptSlhDsaCtx *pkey1, const CryptSlhDsaCtx *pkey2);
+
+#endif // HITLS_CRYPTO_SLH_DSA_CHECK
 
 #endif // HITLS_CRYPTO_SLH_DSA
 #endif // CRYPT_SLH_DSA_H

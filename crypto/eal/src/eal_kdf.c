@@ -73,7 +73,6 @@ static void EalKdfCopyMethod(const EAL_KdfMethod *method, EAL_KdfUnitaryMethod *
     dest->derive = method->derive;
     dest->deinit = method->deinit;
     dest->freeCtx = method->freeCtx;
-    dest->ctrl = method->ctrl;
 }
 
 #ifdef HITLS_CRYPTO_PROVIDER
@@ -117,7 +116,7 @@ static int32_t CRYPT_EAL_SetKdfMethod(CRYPT_EAL_KdfCTX *ctx, const CRYPT_EAL_Fun
     return CRYPT_SUCCESS;
 }
 
-CRYPT_EAL_KdfCTX *CRYPT_EAL_ProviderKdfNewCtx(CRYPT_EAL_LibCtx *libCtx, int32_t algId, const char *attrName)
+CRYPT_EAL_KdfCTX *CRYPT_EAL_ProviderKdfNewCtxInner(CRYPT_EAL_LibCtx *libCtx, int32_t algId, const char *attrName)
 {
     const CRYPT_EAL_Func *funcs = NULL;
     void *provCtx = NULL;
@@ -156,6 +155,28 @@ CRYPT_EAL_KdfCTX *CRYPT_EAL_ProviderKdfNewCtx(CRYPT_EAL_LibCtx *libCtx, int32_t 
     return ctx;
 }
 #endif // HITLS_CRYPTO_PROVIDER
+
+bool CRYPT_EAL_KdfIsValidAlgId(CRYPT_KDF_AlgId id)
+{
+    const EAL_KdfMethod *method = EAL_KdfFindMethod(id);
+    if (method == NULL) {
+        return false;
+    } else {
+        return true;
+    }
+}
+
+CRYPT_EAL_KdfCTX *CRYPT_EAL_ProviderKdfNewCtx(CRYPT_EAL_LibCtx *libCtx, int32_t algId, const char *attrName)
+{
+#ifdef HITLS_CRYPTO_PROVIDER
+    return CRYPT_EAL_ProviderKdfNewCtxInner(libCtx, algId, attrName);
+#else
+    (void)libCtx;
+    (void)attrName;
+    return CRYPT_EAL_KdfNewCtx(algId);
+    return NULL;
+#endif
+}
 
 CRYPT_EAL_KdfCTX *CRYPT_EAL_KdfNewCtx(CRYPT_KDF_AlgId algId)
 {
@@ -216,7 +237,6 @@ int32_t CRYPT_EAL_KdfDerive(CRYPT_EAL_KdfCTX *ctx, uint8_t *key, uint32_t keyLen
         EAL_ERR_REPORT(CRYPT_EVENT_ERR, CRYPT_ALGO_KDF, ctx->id, ret);
         return ret;
     }
-    EAL_EventReport(CRYPT_EVENT_KDF, CRYPT_ALGO_KDF, ctx->id, CRYPT_SUCCESS);
     return CRYPT_SUCCESS;
 }
 
@@ -231,34 +251,17 @@ int32_t CRYPT_EAL_KdfDeInitCtx(CRYPT_EAL_KdfCTX *ctx)
     return CRYPT_SUCCESS;
 }
 
-int32_t CRYPT_EAL_KdfCtrl(CRYPT_EAL_KdfCTX *ctx, int32_t cmd, void *val, uint32_t valLen)
-{
-    if (ctx == NULL || ctx->method == NULL || ctx->method->ctrl== NULL) {
-        EAL_ERR_REPORT(CRYPT_EVENT_ERR, CRYPT_ALGO_KDF, CRYPT_KDF_MAX, CRYPT_NULL_INPUT);
-        return CRYPT_NULL_INPUT;
-    }
-
-    int32_t ret = ctx->method->ctrl(ctx->data, cmd, val, valLen);
-    if (ret != CRYPT_SUCCESS) {
-        EAL_ERR_REPORT(CRYPT_EVENT_ERR, CRYPT_ALGO_KDF, ctx->id, ret);
-    }
-
-    return ret;
-}
-
 void CRYPT_EAL_KdfFreeCtx(CRYPT_EAL_KdfCTX *ctx)
 {
     if (ctx == NULL) {
         return;
     }
-    if (ctx->method == NULL || ctx->method->freeCtx == NULL) {
+    if (ctx->method != NULL && ctx->method->freeCtx != NULL) {
+        ctx->method->freeCtx(ctx->data);
+        EAL_EventReport(CRYPT_EVENT_ZERO, CRYPT_ALGO_KDF, ctx->id, CRYPT_SUCCESS);
+    } else {
         EAL_ERR_REPORT(CRYPT_EVENT_ERR, CRYPT_ALGO_KDF, ctx->id, CRYPT_EAL_ALG_NOT_SUPPORT);
-        BSL_SAL_FREE(ctx->method);
-        BSL_SAL_FREE(ctx);
-        return;
     }
-    EAL_EventReport(CRYPT_EVENT_ZERO, CRYPT_ALGO_KDF, ctx->id, CRYPT_SUCCESS);
-    ctx->method->freeCtx(ctx->data);
     BSL_SAL_FREE(ctx->method);
     BSL_SAL_FREE(ctx);
     return;

@@ -1,1 +1,0 @@
-For details about the API reference, [see](https://apidocen.openhitls.net/modules.html).

@@ -86,42 +86,14 @@
 #define K62  0x9ea1e762U
 #define K63  0x3d43cec5U
 
-/* #define ROTL32(x, n) (((x) << (n)) | ((x) >> (32 - (n)))) 
-   SM3 中的置换函数 P0(x) 与 P1(x) 的定义，依赖32位循环左移 
-*/
-/*@
-  logic integer ROTL32(integer x, integer n) =
-    ((x << n) | ((x >> (32 - n)) & ((1 << n) - 1))) & 0xFFFFFFFF;
-
-  logic integer P0(integer x) =
-    (x ^ ROTL32(x, 9) ^ ROTL32(x, 17)) & 0xFFFFFFFF;
-
-  logic integer P1(integer x) =
-    (x ^ ROTL32(x, 15) ^ ROTL32(x, 23)) & 0xFFFFFFFF;
-*/
 #define P0(x) ((x) ^ ROTL32((x), 9) ^ ROTL32((x), 17))
 #define P1(x) ((x) ^ ROTL32((x), 15) ^ ROTL32((x), 23))
 
-/* SM3中的布尔函数FF和GG */
-/*@
-  logic integer FF0(integer x, integer y, integer z) =
-    (x ^ y ^ z) & 0xFFFFFFFF;
-
-  logic integer FF1(integer x, integer y, integer z) =
-    ((x & y) | (x & z) | (y & z)) & 0xFFFFFFFF;
-
-  logic integer GG0(integer x, integer y, integer z) =
-    (x ^ y ^ z) & 0xFFFFFFFF;
-
-  logic integer GG1(integer x, integer y, integer z) =
-    ((x & y) | ((~x) & z)) & 0xFFFFFFFF;
-*/
 #define FF0(x, y, z) ((x) ^ (y) ^ (z))
 #define FF1(x, y, z) (((x) & (y)) | ((x) & (z)) | ((y) & (z)))
 #define GG0(x, y, z) ((x) ^ (y) ^ (z))
 #define GG1(x, y, z) (((x) & (y)) | (~(x) & (z)))
 
-/* SM3中的单轮运算步骤 */
 #define ROUND(A, B, C, D, E, F, G, H, K, FF, GG, Wj, Wi) do {   \
     uint32_t a12 = ROTL32((A), 12);                            \
     uint32_t ss1 = ROTL32(a12 + (E) + (K), 7);                 \
@@ -142,26 +114,6 @@
     (P1((W1) ^ (W2) ^ ROTL32((W3), 15)) ^ ROTL32((W4), 7) ^ (W5))
 
 /* see the GM standard document GM/T 0004-2012 chapter 5.3.3 */
-/*@
-  requires \valid(state + (0..7));
-  requires blockCnt == 0 || \valid_read(data + (0 .. blockCnt * 64 - 1));
-  requires \separated(state + (0..7), data + (0 .. blockCnt * 64 - 1));
-
-  assigns state[0..7];
-
-  behavior zero_blocks:
-    assumes blockCnt == 0;
-    assigns \nothing;
-    ensures \forall integer i; 0 <= i <= 7 ==> state[i] == \old(state[i]);
-
-  behavior compress_blocks:
-    assumes blockCnt > 0;
-    assigns state[0..7];
-    ensures \true; // 复杂压缩过程，后置条件待后续逐步细化
-
-  complete behaviors;
-  disjoint behaviors;
-*/
 void SM3_Compress(uint32_t state[8], const uint8_t *data, uint32_t blockCnt)
 {
     uint32_t w[16] = {0};
@@ -332,4 +284,3 @@ void SM3_Compress(uint32_t state[8], const uint8_t *data, uint32_t blockCnt)
     }
 }
 #endif // HITLS_CRYPTO_SM3
-

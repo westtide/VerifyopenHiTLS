@@ -552,14 +552,18 @@ void DRBG_CtrUnInstantiate(DRBG_Ctx *drbg)
 
 DRBG_Ctx *DRBG_CtrDup(DRBG_Ctx *drbg)
 {
-    DRBG_CtrCtx *ctx = NULL;
-
     if (drbg == NULL) {
         return NULL;
     }
 
-    ctx = (DRBG_CtrCtx*)drbg->ctx;
-    return DRBG_NewCtrCtx(ctx->ciphMeth, ctx->keyLen,  drbg->isGm, ctx->isUsedDf, &(drbg->seedMeth), drbg->seedCtx);
+    DRBG_CtrCtx *ctx = (DRBG_CtrCtx*)drbg->ctx;
+    DRBG_Ctx *newDrbg = DRBG_NewCtrCtx(ctx->ciphMeth, ctx->keyLen,  drbg->isGm, ctx->isUsedDf, &(drbg->seedMeth),
+        drbg->seedCtx);
+    if (newDrbg == NULL) {
+        return NULL;
+    }
+    newDrbg->libCtx = drbg->libCtx;
+    return newDrbg;
 }
 
 void DRBG_CtrFree(DRBG_Ctx *drbg)
@@ -644,6 +648,8 @@ DRBG_Ctx *DRBG_NewCtrCtx(const EAL_SymMethod *ciphMeth, const uint32_t keyLen, b
         drbg->nonceRange.min = 0;
         drbg->nonceRange.max = 0;
     }
+
+    drbg->predictionResistance = false;
 
     return drbg;
 }

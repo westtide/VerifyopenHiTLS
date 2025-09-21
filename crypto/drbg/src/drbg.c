@@ -184,10 +184,25 @@ static int32_t GetCipherKeyLen(int32_t id, uint32_t *keyLen)
 }
 #endif
 
-DRBG_Ctx *DRBG_New(int32_t algId, BSL_Param *param)
+static int32_t DRBG_Restart(DRBG_Ctx *ctx)
+{
+    if (ctx->state == DRBG_STATE_ERROR) {
+        (void)DRBG_Uninstantiate(ctx);
+    }
+    if (ctx->state == DRBG_STATE_UNINITIALISED) {
+        int32_t ret = DRBG_Instantiate(ctx, NULL, 0, NULL);
+        if (ret != CRYPT_SUCCESS) {
+            BSL_ERR_PUSH_ERROR(ret);
+            return ret;
+        }
+    }
+    return CRYPT_SUCCESS;
+}
+
+DRBG_Ctx *DRBG_New(void *libCtx, int32_t algId, BSL_Param *param)
 {
     int32_t ret;
-
+    (void)libCtx;
     CRYPT_RandSeedMethod seedMethArray = {0};
     CRYPT_RandSeedMethod *seedMeth = &seedMethArray;
     void *seedCtx = NULL;
@@ -227,7 +242,7 @@ DRBG_Ctx *DRBG_New(int32_t algId, BSL_Param *param)
 #endif
 #ifdef HITLS_CRYPTO_DRBG_HMAC
         case RAND_TYPE_MAC:
-            drbg = DRBG_NewHmacCtx((const EAL_MacMethod *)(lu.method), lu.methodId, seedMeth, seedCtx);
+            drbg = DRBG_NewHmacCtx(libCtx, (const EAL_MacMethod *)(lu.method), lu.methodId, seedMeth, seedCtx);
             break;
 #endif
 #ifdef HITLS_CRYPTO_DRBG_CTR
@@ -301,13 +316,11 @@ int32_t DRBG_Instantiate(DRBG_Ctx *ctx, const uint8_t *person, uint32_t persLen,
 
     ret = DRBG_GetNonce(ctx, &nonce, &addEntropy);
     if (ret != CRYPT_SUCCESS) {
-        BSL_ERR_PUSH_ERROR(ret);
         goto ERR_NONCE;
     }
 
     ret = DRBG_GetEntropy(ctx, &entropy, addEntropy);
     if (ret != CRYPT_SUCCESS) {
-        BSL_ERR_PUSH_ERROR(ret);
         goto ERR_ENTROPY;
     }
 
@@ -373,8 +386,9 @@ int32_t DRBG_Reseed(DRBG_Ctx *ctx, const uint8_t *adin, uint32_t adinLen, BSL_Pa
     }
 
     if (ctx->state != DRBG_STATE_READY) {
-        BSL_ERR_PUSH_ERROR(CRYPT_DRBG_ERR_STATE);
-        return CRYPT_DRBG_ERR_STATE;
+        if (DRBG_Restart(ctx) != CRYPT_SUCCESS) {
+            return CRYPT_DRBG_ERR_STATE;
+        }
     }
 
     ctx->state = DRBG_STATE_ERROR;
@@ -421,8 +435,9 @@ int32_t DRBG_Generate(DRBG_Ctx *ctx, uint8_t *out, uint32_t outLen,
     }
 
     if (ctx->state != DRBG_STATE_READY) {
-        BSL_ERR_PUSH_ERROR(CRYPT_DRBG_ERR_STATE);
-        return CRYPT_DRBG_ERR_STATE;
+        if (DRBG_Restart(ctx) != CRYPT_SUCCESS) {
+            return CRYPT_DRBG_ERR_STATE;
+        }
     }
 
     if (DRBG_IsNeedReseed(ctx, pr)) {
@@ -454,7 +469,7 @@ int32_t DRBG_GenerateBytes(DRBG_Ctx *ctx, uint8_t *out, uint32_t outLen,
         return CRYPT_NULL_INPUT;
     }
     int32_t ret;
-    bool pr = false;
+    bool pr = ctx->predictionResistance;
     const BSL_Param *temp = NULL;
     if ((temp = BSL_PARAM_FindConstParam(param, CRYPT_PARAM_RAND_PR)) != NULL) {
         uint32_t boolSize = sizeof(bool);
@@ -533,6 +548,16 @@ static int32_t DRBG_SetReseedInterval(DRBG_Ctx *ctx, const void *val, uint32_t l
     return CRYPT_SUCCESS;
 }
 
+static int32_t DRBG_SetPredictionResistance(DRBG_Ctx *ctx, const void *val, uint32_t len)
+{
+    if (val == NULL || len != sizeof(bool)) {
+        BSL_ERR_PUSH_ERROR(CRYPT_INVALID_ARG);
+        return CRYPT_INVALID_ARG;
+    }
+    ctx->predictionResistance = *(const bool *)val;
+    return CRYPT_SUCCESS;
+}
+
 int32_t DRBG_Ctrl(DRBG_Ctx *ctx, int32_t opt, void *val, uint32_t len)
 {
     if (ctx == NULL) {
@@ -548,6 +573,8 @@ int32_t DRBG_Ctrl(DRBG_Ctx *ctx, int32_t opt, void *val, uint32_t len)
 #endif // HITLS_CRYPTO_DRBG_GM
         case CRYPT_CTRL_SET_RESEED_INTERVAL:
             return DRBG_SetReseedInterval(ctx, val, len);
+        case CRYPT_CTRL_SET_PREDICTION_RESISTANCE:
+            return DRBG_SetPredictionResistance(ctx, val, len);
         default:
             break;
     }

@@ -1,3 +1,18 @@
+/*
+ * This file is part of the openHiTLS project.
+ *
+ * openHiTLS is licensed under the Mulan PSL v2.
+ * You can use this software according to the terms and conditions of the Mulan PSL v2.
+ * You may obtain a copy of Mulan PSL v2 at:
+ *
+ *     http://license.coscl.org.cn/MulanPSL2
+ *
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND,
+ * EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
+ * MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+ * See the Mulan PSL v2 for more details.
+ */
+
 #include "hitls_build.h"
 #if defined(HITLS_CRYPTO_EAL) && defined(HITLS_CRYPTO_KDF)
 
@@ -23,7 +38,7 @@
     EAL_KdfMethod g_kdfMethod_##name = {         \
         (KdfNewCtx)CRYPT_##name##_NewCtx,  (KdfSetParam)CRYPT_##name##_SetParam,      \
         (KdfDerive)CRYPT_##name##_Derive,  (KdfDeinit)CRYPT_##name##_Deinit,          \
-        (KdfFreeCtx)CRYPT_##name##_FreeCtx, NULL \
+        (KdfFreeCtx)CRYPT_##name##_FreeCtx                                            \
     }
 
 #ifdef HITLS_CRYPTO_PBKDF2

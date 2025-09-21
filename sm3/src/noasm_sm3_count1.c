@@ -135,36 +135,38 @@ ivette -wp -rte \
   // 内存安全：确保 state 指针指向一个有效的、可写的8个uint32_t大小的内存区域
   requires \valid(state + (0..7));
   // 内存安全：只有在有数据块需要处理时，才要求 data 指针是可读的
-  requires blockCnt > 0 ==> \valid_read(data + (0 .. blockCnt * 64 - 1));
+  requires blockCnt >= 0 ==> \valid_read(data + (0 .. blockCnt * 64 - 1));
   // 内存安全：确保 state 和 data 指向的内存区域没有重叠，防止数据损坏
   requires \separated(state + (0..7), data + (0.. blockCnt * 64 - 1));
   // 内存安全：该函数唯一允许修改的内存是 state 数组
   assigns state[0..7];
-
-  // 行为1：没有数据块要处理
-  behavior zero_blocks:
+  
+  behavior zero_block:         // 行为1：没有数据块要处理
     assumes blockCnt == 0;
     assigns \nothing;
-    ensures \forall integer i; 0 <= i <= 7 ==> state[i] == \at(state[i], Pre);
+    ensures \forall integer i; 0 <= i <= 7 ==> state[i] == \old(state[i]);
+  ensures \true;
 
-  // 行为2：只执行一次循环
-  behavior one_block:
+  behavior one_block:           // 行为2：一次循环：C的state数组的值必须等于幽灵模型计算出的最终状态
     assumes blockCnt == 1;
-    // 功能正确性：函数执行后，C的state数组的值必须等于幽灵模型计算出的最终状态
+    assigns state[0..7];
     ensures State_equals_array(
-      SM3_Compression_Full(
+        SM3_Process_Block(\at(State_from_array(state), Pre), (uint8_t*)data),
+        state
+    );
+
+ behavior full_blocks:
+      assumes blockCnt > 1;
+      assigns state[0..7];
+      ensures State_equals_array(
+        SM3_Compression_Full(
             \at(State_from_array(state), Pre),
             (uint8_t*)data,
-            1 // 明确指定块数为1
+            blockCnt
         ),
         state
     );
-  // 行为3：执行完整循环
-  behavior full_blocks:
-      assumes blockCnt > 1;
-      assigns state[0..7];
-      // 后置条件 (Ensures): 暂时设置为 \true，不进行功能验证，以节省时间
-      ensures \true;
+
   
   complete behaviors;
   disjoint behaviors;
@@ -182,20 +184,24 @@ void SM3_Compress(uint32_t state[8], const uint8_t *data, uint32_t blockCnt)
     loop invariant input == \at(data, Pre) + (\at(blockCnt, Pre) - count) * 64;
     // 保证 w 数组的内存安全
     loop invariant \valid(w + (0..15));
-    // 将每轮循环开始时的状态与 Ghost 模型关联
     loop invariant State_equals_array(
-        SM3_Compression_Full(
-            \at(State_from_array(state), Pre),
-            (uint8_t*)\at(data, Pre),
-            \at(blockCnt, Pre) - count
-        ),
-        state
+       SM3_Compression_Full(
+           \at(State_from_array(state), Pre),
+           (uint8_t*)\at(data, Pre),
+           \at(blockCnt, Pre) - count
+       ),
+       state
     );
+
     loop assigns count, input, state[0..7], w[0..15];
     loop variant count;
   */
+
   while (count > 0)
   {
+     /*@ ghost L_loop_start: ; */
+
+
     w[0] = GET_UINT32_BE(input, 0);
     w[1] = GET_UINT32_BE(input, 4);
     w[2] = GET_UINT32_BE(input, 8);
@@ -344,9 +350,12 @@ void SM3_Compress(uint32_t state[8], const uint8_t *data, uint32_t blockCnt)
     w[3] = EXPAND(w[3], w[10], w[0], w[6], w[13]);
     ROUND16_63(b, c, d, e, f, g, h, a, K63, w[15], w[15] ^ w[3]);
 
-    /*@
-      // 暂时简化断言以避免复杂的逻辑表达式
-      assert \true;
+ /*@
+      // 直接在 assert 中进行比较
+      // 左边是根据更新后的 a,b,c..h 构建的“事后”状态
+      // 右边是通过 \at 获取的“事前”状态经过逻辑函数转换后的期望状态
+      assert SM3_State_make(a,b,c,d,e,f,g,h) == 
+        SM3_Permutation_Recursive(\at(State_from_array(state), L_loop_start), (uint8_t*)input, 0);
     */
     
     state[0] ^= a;

@@ -67,7 +67,7 @@ static void FreeValueList(void *ptr)
     }
     BslList *valueList = (BslList *)ptr;
     BSL_LIST_DeleteAll(valueList, AttributeValueFree);
-    BSL_SAL_FREE(valueList);
+    BSL_SAL_Free(valueList);
 }
 
 // Value copy callback function, essentially a function to create a new value list
@@ -108,9 +108,7 @@ static void *ValueDupFunc(void *ptr, size_t size)
     return newList;
 
 ERR:
-    if (newValue!= NULL) {
-        AttributeValueFree(newValue);
-    }
+    AttributeValueFree(newValue);
     BSL_SAL_Free(newList);
     return NULL;
 }
@@ -134,8 +132,6 @@ static void KeyFreeFunc(void *ptr)
 static int32_t UpdateAttributeValueNode(BSL_HASH_Hash *hash, BSL_HASH_Iterator node,
     uintptr_t value, uint32_t valueSize)
 {
-    int32_t ret;
-
     if (hash == NULL || valueSize == 0) {
         BSL_ERR_PUSH_ERROR(CRYPT_INVALID_ARG);
         return CRYPT_INVALID_ARG;
@@ -150,23 +146,16 @@ static int32_t UpdateAttributeValueNode(BSL_HASH_Hash *hash, BSL_HASH_Iterator n
     newValue->valueStr = BSL_SAL_Dump(srcValue->valueStr, BSL_SAL_Strnlen(srcValue->valueStr, UINT32_MAX) + 1);
     if (newValue->judgeStr == NULL || newValue->valueStr == NULL) {
         BSL_ERR_PUSH_ERROR(CRYPT_MEM_ALLOC_FAIL);
-        ret = CRYPT_MEM_ALLOC_FAIL;
-        goto ERR;
+        AttributeValueFree(newValue);
+        return CRYPT_MEM_ALLOC_FAIL;
     }
 
     BslList *valueList = (BslList *)BSL_HASH_IterValue(hash, node);
-    ret = BSL_LIST_AddElement(valueList, (AttributeValue *)newValue, BSL_LIST_POS_END);
+    int32_t ret = BSL_LIST_AddElement(valueList, (AttributeValue *)newValue, BSL_LIST_POS_END);
     if (ret != BSL_SUCCESS) {
         BSL_ERR_PUSH_ERROR(ret);
-        goto ERR;
+        AttributeValueFree(newValue);
     }
-
-    return CRYPT_SUCCESS;
-
-ERR:
-    BSL_SAL_FREE(newValue->judgeStr);
-    BSL_SAL_FREE(newValue->valueStr);
-    BSL_SAL_FREE(newValue);
     return ret;
 }
 
@@ -254,7 +243,7 @@ static int32_t ParseAttributeValue(const char *attribute, int32_t *startPos, cha
         goto ERR;
     }
 
-    *startPos = attribute[valueEnd] == '\0'? valueEnd : valueEnd + 1;
+    *startPos = attribute[valueEnd] == '\0' ? valueEnd : valueEnd + 1;
     *key = tempKey;
     *value = tempValue;
     return CRYPT_SUCCESS;
@@ -299,7 +288,7 @@ static int32_t ParseAttributeString(InputAttributeStrInfo *attrInfo)
             tempMustAttributeNum++;
         }
 
-        ret = BSL_HASH_Put(hash, (uintptr_t)key, BSL_SAL_Strnlen(key, UINT32_MAX)+1,
+        ret = BSL_HASH_Put(hash, (uintptr_t)key, BSL_SAL_Strnlen(key, UINT32_MAX) + 1,
                            (uintptr_t)value, sizeof(AttributeValue), UpdateAttributeValueNode);
         BSL_SAL_FREE(key);
         AttributeValueFree(value);
@@ -400,7 +389,7 @@ static int32_t CompareAttribute(BSL_HASH_Hash *hash, const char *attribute,
 }
 
 static void FindHighestScoreFunc(CRYPT_EAL_LibCtx *localCtx, int32_t operaId, int32_t algId,
-    InputAttributeStrInfo attrInfo, const CRYPT_EAL_Func **implFunc, void **ctx)
+    InputAttributeStrInfo attrInfo, const CRYPT_EAL_Func **implFunc, CRYPT_EAL_ProvMgrCtx **mgrCtx)
 {
     int32_t ret;
     int32_t totalScore = -1;
@@ -424,7 +413,7 @@ static void FindHighestScoreFunc(CRYPT_EAL_LibCtx *localCtx, int32_t operaId, in
             }
             if (attribute == NULL) {
                 *implFunc = algInfos[index].implFunc;
-                *ctx = node->provCtx;
+                *mgrCtx = node;
                 return;
             }
             int32_t tempScore;
@@ -434,7 +423,7 @@ static void FindHighestScoreFunc(CRYPT_EAL_LibCtx *localCtx, int32_t operaId, in
             }
             totalScore = tempScore;
             *implFunc = algInfos[index].implFunc;
-            *ctx = node->provCtx;
+            *mgrCtx = node;
             if (repeatFlag) {
                 continue;
             }
@@ -444,11 +433,11 @@ static void FindHighestScoreFunc(CRYPT_EAL_LibCtx *localCtx, int32_t operaId, in
 }
 
 int32_t CRYPT_EAL_CompareAlgAndAttr(CRYPT_EAL_LibCtx *localCtx, int32_t operaId,
-    int32_t algId, const char *attribute, const CRYPT_EAL_Func **funcs, void **provCtx)
+    int32_t algId, const char *attribute, const CRYPT_EAL_Func **funcs, CRYPT_EAL_ProvMgrCtx **mgrCtx)
 {
     int32_t ret;
     const CRYPT_EAL_Func *implFunc = NULL;
-    void *ctx = NULL;
+    CRYPT_EAL_ProvMgrCtx *ctx = NULL;
     InputAttributeStrInfo attrInfo = {0};
 
     if (attribute != NULL) {
@@ -475,8 +464,8 @@ int32_t CRYPT_EAL_CompareAlgAndAttr(CRYPT_EAL_LibCtx *localCtx, int32_t operaId,
         return CRYPT_NOT_SUPPORT;
     }
     *funcs = implFunc;
-    if (provCtx != NULL) {
-        *provCtx = ctx;
+    if (mgrCtx != NULL) {
+        *mgrCtx = ctx;
     }
     return CRYPT_SUCCESS;
 }
